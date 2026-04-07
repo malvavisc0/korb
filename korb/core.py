@@ -94,19 +94,19 @@ class _HTMLResultsParser(HTMLParser):
         self.games: list[Game] = []
         self._in_td = False
         self._td_depth = 0
-        self._in_strike = False
         self._cells: list[str] = []
         self._current_cell = ""
         self._row_cancelled = False
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, Optional[str]]]
+    ) -> None:  # noqa: unused
         if tag == "td":
             if self._td_depth == 0:
                 self._in_td = True
                 self._current_cell = ""
             self._td_depth += 1
         elif tag == "strike":
-            self._in_strike = True
             self._row_cancelled = True
 
     def handle_endtag(self, tag: str) -> None:
@@ -115,8 +115,6 @@ class _HTMLResultsParser(HTMLParser):
             if self._td_depth == 0:
                 self._cells.append(self._current_cell.strip())
                 self._in_td = False
-        elif tag == "strike":
-            self._in_strike = False
         elif tag == "tr":
             self._finalize_row()
             self._cells = []

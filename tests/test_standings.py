@@ -55,8 +55,10 @@ class TestUpdateStats:
     def _game(self, home_score: int, away_score: int) -> Game:
         return Game(
             date=datetime(2026, 1, 15, 10, 0),
-            home="Team A", away="Team B",
-            home_score=home_score, away_score=away_score,
+            home="Team A",
+            away="Team B",
+            home_score=home_score,
+            away_score=away_score,
         )
 
     def test_home_win(self):
@@ -91,15 +93,19 @@ class TestUpdateStats:
 class TestCalculateStandings:
     def test_sorting(self, ergebnisse_path):
         from korb.standings import calculate_standings
+
         standings, _ = calculate_standings(ergebnisse_path)
         for i in range(len(standings) - 1):
             s1, s2 = standings[i], standings[i + 1]
             assert (s1.stats.pts, s1.stats.diff, s1.stats.pf) >= (
-                s2.stats.pts, s2.stats.diff, s2.stats.pf,
+                s2.stats.pts,
+                s2.stats.diff,
+                s2.stats.pf,
             )
 
     def test_empty_input(self, tmp_path):
         from korb.standings import calculate_standings
+
         f = tmp_path / "empty.html"
         f.write_text(
             "<html><head>"

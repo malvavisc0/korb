@@ -14,13 +14,16 @@ from korb.standings import TeamStats
 
 
 def _make_game(
-    home: str, away: str,
-    home_score: int, away_score: int,
+    home: str,
+    away: str,
+    home_score: int,
+    away_score: int,
     days_ago: int = 0,
 ) -> Game:
     dt = datetime(2026, 1, 15, 10, 0) - timedelta(days=days_ago)
-    return Game(date=dt, home=home, away=away,
-                home_score=home_score, away_score=away_score)
+    return Game(
+        date=dt, home=home, away=away, home_score=home_score, away_score=away_score
+    )
 
 
 class TestRecencyWeight:
@@ -68,10 +71,7 @@ class TestCalcStrength:
 
 class TestCalcFormTotals:
     def test_last_n_games_only(self):
-        games = [
-            _make_game("A", "B", 80, 70, days_ago=i)
-            for i in range(10)
-        ]
+        games = [_make_game("A", "B", 80, 70, days_ago=i) for i in range(10)]
         fpf, fpa, fgp = _calc_form_totals(games)
         # Each team appears in 10 games, but only last 5 counted
         assert fgp["A"] == 5
@@ -99,8 +99,9 @@ class TestBuildRatings:
         teams = {"A": TeamStats(gp=1, pf=80, pa=70)}
         form_pf, form_pa, form_gp = {}, {}, {}
 
-        ratings = _build_ratings(w_pf, w_pa, w_gp, league_avg, teams,
-                                 form_pf, form_pa, form_gp)
+        ratings = _build_ratings(
+            w_pf, w_pa, w_gp, league_avg, teams, form_pf, form_pa, form_gp
+        )
         off, def_ = ratings["A"]
         # With 1 game and MIN_GAMES=3, blend = 1/3
         raw_off = (80.0 / 1.0) / 75.0  # ~1.067
@@ -119,8 +120,9 @@ class TestBuildRatings:
         form_pa = {"A": 300.0}
         form_gp = {"A": 5}
 
-        ratings = _build_ratings(w_pf, w_pa, w_gp, league_avg, teams,
-                                 form_pf, form_pa, form_gp)
+        ratings = _build_ratings(
+            w_pf, w_pa, w_gp, league_avg, teams, form_pf, form_pa, form_gp
+        )
         off, def_ = ratings["A"]
         # Should be a blend of season and form
         assert off > 0
@@ -151,7 +153,11 @@ class TestPredictGame:
         ratings = {"A": (1.2, 0.9), "B": (1.0, 1.0)}
         _, hs_normal, as_normal = predict_game("A", "B", ratings, 75.0)
         _, hs_fatigued, _ = predict_game(
-            "A", "B", ratings, 75.0, home_fatigue=0.95,
+            "A",
+            "B",
+            ratings,
+            75.0,
+            home_fatigue=0.95,
         )
         assert hs_fatigued < hs_normal  # Fatigued home scores less
 
@@ -159,20 +165,22 @@ class TestPredictGame:
 class TestPredictStandings:
     def test_full_integration(self, ergebnisse_path, spielplan_path):
         from korb.predict import predict_standings
+
         standings, preds = predict_standings(ergebnisse_path, spielplan_path)
         assert len(standings) > 0
         # Verify sorting
         for i in range(len(standings) - 1):
             s1, s2 = standings[i], standings[i + 1]
             assert (s1.stats.pts, s1.stats.diff, s1.stats.pf) >= (
-                s2.stats.pts, s2.stats.diff, s2.stats.pf,
+                s2.stats.pts,
+                s2.stats.diff,
+                s2.stats.pf,
             )
 
     def test_no_pending_games(self, ergebnisse_path, spielplan_finalized_path):
         from korb.predict import predict_standings
-        standings, preds = predict_standings(
-            ergebnisse_path, spielplan_finalized_path
-        )
+
+        standings, preds = predict_standings(ergebnisse_path, spielplan_finalized_path)
         assert len(preds) == 0
         # Standings should still reflect completed games
         assert len(standings) > 0

@@ -135,5 +135,6 @@ class TestReadGames:
 
     def test_missing_file_raises(self, tmp_path):
         import pytest
+
         with pytest.raises(SystemExit):
             read_games(str(tmp_path / "nonexistent.html"))

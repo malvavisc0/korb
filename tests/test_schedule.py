@@ -73,14 +73,16 @@ class TestParseSchedule:
 
 
 class TestFilterSchedule:
-    def _make_game(
-        self, days_offset: int, cancelled: bool = False
-    ) -> ScheduledGame:
+    def _make_game(self, days_offset: int, cancelled: bool = False) -> ScheduledGame:
         dt = datetime.now() + timedelta(days=days_offset)
         return ScheduledGame(
-            nr=1, day=1, date=dt,
-            home="Team A", away="Team B",
-            venue="Halle", cancelled=cancelled,
+            nr=1,
+            day=1,
+            date=dt,
+            home="Team A",
+            away="Team B",
+            venue="Halle",
+            cancelled=cancelled,
         )
 
     def test_pending_only(self):
@@ -93,8 +95,13 @@ class TestFilterSchedule:
     def test_team_filter(self):
         g1 = self._make_game(days_offset=10)
         g2 = ScheduledGame(
-            nr=2, day=1, date=g1.date, home="Team C", away="Team D",
-            venue="Halle", cancelled=False,
+            nr=2,
+            day=1,
+            date=g1.date,
+            home="Team C",
+            away="Team D",
+            venue="Halle",
+            cancelled=False,
         )
         result = filter_schedule([g1, g2], team="team a")
         assert len(result) == 1
@@ -132,8 +139,13 @@ class TestMarkBackToBack:
         games = [
             ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", False),
             ScheduledGame(
-                2, 1, base.replace(hour=18),
-                "Team A", "Team C", "Halle", False,
+                2,
+                1,
+                base.replace(hour=18),
+                "Team A",
+                "Team C",
+                "Halle",
+                False,
             ),
         ]
         b2b = mark_back_to_back(games, threshold_h=36)
@@ -147,8 +159,13 @@ class TestMarkBackToBack:
         games = [
             ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", False),
             ScheduledGame(
-                2, 1, base.replace(day=17),
-                "Team A", "Team C", "Halle", False,
+                2,
+                1,
+                base.replace(day=17),
+                "Team A",
+                "Team C",
+                "Halle",
+                False,
             ),
         ]
         b2b = mark_back_to_back(games, threshold_h=36)

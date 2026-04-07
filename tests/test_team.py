@@ -1,5 +1,7 @@
 """Tests for korb.team module."""
 
+from datetime import datetime
+
 from korb.core import Game
 from korb.team import (
     GameResult,
@@ -8,7 +10,6 @@ from korb.team import (
     _sparkline_char,
     get_team_results,
 )
-from datetime import datetime
 
 
 class TestGameResultDiff:
@@ -40,8 +41,10 @@ class TestGameToResult:
     def _game(self, home_score: int, away_score: int) -> Game:
         return Game(
             date=datetime(2026, 1, 15, 10, 0),
-            home="Team A", away="Team B",
-            home_score=home_score, away_score=away_score,
+            home="Team A",
+            away="Team B",
+            home_score=home_score,
+            away_score=away_score,
         )
 
     def test_home_perspective_win(self):
