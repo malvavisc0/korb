@@ -7,16 +7,14 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
-from typing import Final, Optional
+from typing import Optional
 
 from korb.core import (
-    _set_league_name,
+    extract_league_name,
     parse_date,
     print_header,
     read_file_safe,
 )
-
-HTML_FILE: Final[str] = "files/spielplan.html"
 
 
 @dataclass
@@ -34,10 +32,13 @@ class ScheduledGame:
     def to_dict(self) -> dict:
         """Serializable dict."""
         return {
-            "nr": self.nr, "day": self.day,
+            "nr": self.nr,
+            "day": self.day,
             "date": self.date.strftime("%d.%m.%Y %H:%M"),
-            "home": self.home, "away": self.away,
-            "venue": self.venue, "cancelled": self.cancelled,
+            "home": self.home,
+            "away": self.away,
+            "venue": self.venue,
+            "cancelled": self.cancelled,
         }
 
 
@@ -55,9 +56,7 @@ class _HTMLScheduleParser(HTMLParser):
         self._current_cell = ""
         self._row_cancelled = False
 
-    def handle_starttag(
-        self, tag: str, attrs: list[tuple[str, Optional[str]]]
-    ) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         """Track table cell and cancellation markers in HTML.
 
         Args:
@@ -129,21 +128,21 @@ class _HTMLScheduleParser(HTMLParser):
             pass
 
 
-def parse_schedule(html_file: str = HTML_FILE) -> list[ScheduledGame]:
+def parse_schedule(html_file: str) -> tuple[list[ScheduledGame], str]:
     """Parse HTML file into scheduled games, sorted newest first.
 
     Args:
         html_file: Path to HTML schedule file.
 
     Returns:
-        List of ScheduledGame objects sorted by date descending.
+        Tuple of (games sorted by date descending, league_name).
     """
     content = read_file_safe(html_file)
-    _set_league_name(content)
+    league_name = extract_league_name(content)
     parser = _HTMLScheduleParser()
     parser.feed(content)
     parser.games.sort(key=lambda g: g.date, reverse=True)
-    return parser.games
+    return parser.games, league_name
 
 
 def filter_schedule(
@@ -169,12 +168,22 @@ def filter_schedule(
         filtered = [g for g in filtered if g.date >= now]
     if team:
         t = team.lower()
-        filtered = [
-            g
-            for g in filtered
-            if t in g.home.lower() or t in g.away.lower()
-        ]
+        filtered = [g for g in filtered if t in g.home.lower() or t in g.away.lower()]
     return filtered
+
+
+def is_season_finalized(html_path: str) -> tuple[bool, int]:
+    """Check if season has no remaining games.
+
+    Args:
+        html_path: Path to HTML schedule file.
+
+    Returns:
+        Tuple of (is_finalized, pending_count).
+    """
+    games, _ = parse_schedule(html_path)
+    pending = filter_schedule(games, pending=True)
+    return len(pending) == 0, len(pending)
 
 
 def mark_back_to_back(
@@ -198,14 +207,8 @@ def mark_back_to_back(
     for idx, g in ordered:
         gt = g.date.timestamp()
 
-        home_b2b = (
-            g.home in last_game_ts
-            and (gt - last_game_ts[g.home]) <= threshold_s
-        )
-        away_b2b = (
-            g.away in last_game_ts
-            and (gt - last_game_ts[g.away]) <= threshold_s
-        )
+        home_b2b = g.home in last_game_ts and (gt - last_game_ts[g.home]) <= threshold_s
+        away_b2b = g.away in last_game_ts and (gt - last_game_ts[g.away]) <= threshold_s
         b2b[idx] = bool(home_b2b or away_b2b)
 
         last_game_ts[g.home] = gt
@@ -214,11 +217,17 @@ def mark_back_to_back(
     return b2b
 
 
-def print_schedule(games: list[ScheduledGame], b2b: bool = False) -> None:
+def print_schedule(
+    games: list[ScheduledGame],
+    league_name: str = "Basketball League",
+    b2b: bool = False,
+) -> None:
     """Print schedule table to stdout.
 
     Args:
         games: List of scheduled games to display.
+        league_name: League name for header.
+        b2b: Mark back-to-back fixtures.
     """
     if not games:
         print("No games found.")
@@ -240,7 +249,7 @@ def print_schedule(games: list[ScheduledGame], b2b: bool = False) -> None:
     )
     venue_w = max(5, max(len(g.venue) for g in games))
 
-    print_header("Schedule")
+    print_header("Schedule", league_name)
 
     hdr = (
         f"{'Nr.':<{nr_w}}  {'Tag':>{day_w}}  "

@@ -3,6 +3,7 @@
 
 Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 """
+
 import argparse
 import json
 import sys
@@ -10,17 +11,15 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from .core import HTML_FILE as RESULTS_FILE
+from .predict import predict_standings, print_predicted_standings, print_predictions
 from .schedule import (
-    HTML_FILE as SCHEDULE_FILE,
     filter_schedule,
+    is_season_finalized,
     parse_schedule,
     print_schedule,
 )
 from .standings import calculate_standings, print_table
-from .team import get_team_results, print_results, print_bars, print_metrics
-from .predict import predict_standings, print_predictions
-from .predict import print_predicted_standings
+from .team import get_team_results, print_bars, print_metrics, print_results
 
 
 def _json_out(data: object) -> None:
@@ -30,53 +29,114 @@ def _json_out(data: object) -> None:
 
 def cmd_standings(args: argparse.Namespace) -> None:
     """Handle 'standings' subcommand."""
-    standings = calculate_standings(filepath=args.results)
+    fp = args.results
+    if fp is None:
+        if args.liganr is None:
+            print(
+                "Error: pass --results PATH or --liganr LIGANR " "for standings.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+
+    standings, league_name = calculate_standings(fp)
     if args.json:
         _json_out([s.to_dict() for s in standings])
     else:
-        print_table(standings)
+        print_table(standings, league_name)
 
 
 def cmd_team(args: argparse.Namespace) -> None:
     """Handle 'team' subcommand."""
-    results = get_team_results(args.name, filepath=args.results)
+    fp = args.results
+    if fp is None:
+        if args.liganr is None:
+            print(
+                "Error: pass --results PATH or --liganr LIGANR " "for team results.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+
+    results, league_name = get_team_results(args.name, fp)
     if args.json:
         data = [r.to_dict() for r in results]
         _json_out({"team": args.name, "results": data})
         return
-    print_results(args.name, results)
+    print_results(args.name, results, league_name)
     if args.bars:
         print()
         print_bars(results)
     if args.metrics or args.last_k:
         print()
-        print_metrics(results, last_k=args.last_k)
+        print_metrics(results, league_name, last_k=args.last_k)
 
 
 def cmd_schedule(args: argparse.Namespace) -> None:
     """Handle 'schedule' subcommand."""
-    games = parse_schedule(args.html)
+    html = args.html
+    if html is None:
+        if args.liganr is None:
+            print(
+                "Error: pass --html PATH or --liganr LIGANR for schedule.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        html = str(Path("files") / str(args.liganr) / "spielplan.html")
+
+    games, league_name = parse_schedule(html)
     filtered = filter_schedule(
         games, show_all=args.all, pending=args.pending, team=args.team
     )
     if args.json:
         _json_out([g.to_dict() for g in filtered])
     else:
-        print_schedule(filtered, b2b=args.b2b)
+        print_schedule(filtered, league_name, b2b=args.b2b)
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
     """Handle 'predict' subcommand."""
-    standings, preds = predict_standings(args.results, args.html)
+    rp = args.results
+    sp = args.html
+    if rp is None or sp is None:
+        if args.liganr is None:
+            print(
+                "Error: pass --results PATH and --html PATH, "
+                "or provide --liganr LIGANR.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        base = Path("files") / str(args.liganr)
+        rp = rp or str(base / "ergebnisse.html")
+        sp = sp or str(base / "spielplan.html")
+
+    # Check if season is finalized
+    finalized, pending_count = is_season_finalized(sp)
+    if finalized:
+        print(
+            "Error: Season is finalized (no pending games). "
+            "Prediction is not available.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    standings, preds = predict_standings(rp, sp)
     if args.json:
-        _json_out({
-            "predictions": [
-                {"home": g.home, "away": g.away, "winner": w,
-                 "home_score": hs, "away_score": aws}
-                for g, w, hs, aws in preds
-            ],
-            "standings": [s.to_dict() for s in standings],
-        })
+        _json_out(
+            {
+                "predictions": [
+                    {
+                        "home": g.home,
+                        "away": g.away,
+                        "winner": w,
+                        "home_score": hs,
+                        "away_score": aws,
+                    }
+                    for g, w, hs, aws in preds
+                ],
+                "standings": [s.to_dict() for s in standings],
+            }
+        )
     else:
         print_predictions(preds)
         print_predicted_standings(standings)
@@ -91,7 +151,17 @@ def _blocks(value: int, scale: int) -> str:
 def cmd_top(args: argparse.Namespace) -> None:
     """Handle 'top' subcommand."""
 
-    standings = calculate_standings(filepath=args.results)
+    fp = args.results
+    if fp is None:
+        if args.liganr is None:
+            print(
+                "Error: pass --results PATH or --liganr LIGANR for top.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+
+    standings, _league_name = calculate_standings(fp)
     top = standings[: args.n]
 
     if args.json:
@@ -103,18 +173,14 @@ def cmd_top(args: argparse.Namespace) -> None:
     print("  Top Teams — current table")
     print("=" * 70)
 
-    hdr = (
-        f"{'#':>2}  {'Team':<{tw}}  {'GP':>2}  {'Pts':>3}  {'Diff':>5}"
-    )
+    hdr = f"{'#':>2}  {'Team':<{tw}}  {'GP':>2}  {'Pts':>3}  {'Diff':>5}"
     print(hdr)
     print("-" * len(hdr))
     for i, s in enumerate(top, 1):
         st = s.stats
         diff = st.diff
         diff_str = f"+{diff}" if diff > 0 else str(diff)
-        print(
-            f"{i:>2}  {s.name:<{tw}}  {st.gp:>2}  {st.pts:>3}  {diff_str:>5}"
-        )
+        print(f"{i:>2}  {s.name:<{tw}}  {st.gp:>2}  {st.pts:>3}  {diff_str:>5}")
 
     # Points bar chart (ASCII)
     pts_vals = [s.stats.pts for s in top]
@@ -126,9 +192,7 @@ def cmd_top(args: argparse.Namespace) -> None:
     for s in top:
         st = s.stats
         pts = st.pts
-        print(
-            f"{s.name:<{tw}}  {_blocks(pts, scale):<22}  {pts}"
-        )
+        print(f"{s.name:<{tw}}  {_blocks(pts, scale):<22}  {pts}")
     print(f"(scale: 1 block ≈ {scale} pts)")
 
 
@@ -147,7 +211,12 @@ _SCHEDULE_URL = (
 
 def cmd_download(args: argparse.Namespace) -> None:
     """Handle 'download' subcommand."""
-    out = Path("files")
+    out_root = Path("files")
+    out_root.mkdir(exist_ok=True)
+
+    # New layout: keep per-league artifacts in their own subfolder.
+    # Example: files/<liganr>/ergebnisse.html + files/<liganr>/spielplan.html
+    out = out_root / str(args.liganr)
     out.mkdir(exist_ok=True)
     targets = [
         (_RESULTS_URL.format(liga_id=args.liganr), out / "ergebnisse.html"),
@@ -169,56 +238,69 @@ def main() -> None:
         prog="korb", description="Basketball league analysis tools"
     )
     parser.add_argument(
-        "--results", "-r",
-        default=RESULTS_FILE,
-        help=f"HTML results file path (default: {RESULTS_FILE})",
+        "--results",
+        "-r",
+        default=None,
+        help="HTML results file path (files/<liganr>/ergebnisse.html)",
     )
     parser.add_argument(
-        "--json", action="store_true",
+        "--json",
+        action="store_true",
         help="Output as JSON instead of formatted tables",
     )
 
     subs = parser.add_subparsers(dest="command", required=True)
 
     p_st = subs.add_parser("standings", help="Display league standings")
+    p_st.add_argument(
+        "--liganr",
+        type=int,
+        help="Liga ID; uses files/<liganr>/ergebnisse.html",
+    )
     p_st.set_defaults(func=cmd_standings)
 
     p_tm = subs.add_parser("team", help="Display results for a team")
     p_tm.add_argument("name", help="Team name (e.g., 'TV 1877 Lauf')")
     p_tm.add_argument(
-        "--bars", "-b", action="store_true",
-        help="Show point differential bar chart"
+        "--liganr",
+        type=int,
+        help="Liga ID; uses files/<liganr>/ergebnisse.html",
+    )
+    p_tm.add_argument(
+        "--bars", "-b", action="store_true", help="Show point differential bar chart"
     )
     p_tm.add_argument(
         "--last-k",
         type=int,
         default=None,
-        help="Analyze only the most recent K games (newest-first)"
+        help="Analyze only the most recent K games (newest-first)",
     )
     p_tm.add_argument(
         "--metrics",
         action="store_true",
-        help="Show win-rate + margin quality metrics (respects --last-k)"
+        help="Show win-rate + margin quality metrics (respects --last-k)",
     )
     p_tm.set_defaults(func=cmd_team)
 
     p_sc = subs.add_parser("schedule", help="Display game schedule")
     p_sc.add_argument(
         "--html",
-        default=SCHEDULE_FILE,
-        help=f"Schedule HTML file (default: {SCHEDULE_FILE})",
+        default=None,
+        help="Schedule HTML file (files/<liganr>/spielplan.html)",
     )
     p_sc.add_argument(
-        "--all", "-a", action="store_true", help="Show cancelled games"
+        "--liganr",
+        type=int,
+        help="Liga ID; uses files/<liganr>/spielplan.html",
     )
+    p_sc.add_argument("--all", "-a", action="store_true", help="Show cancelled games")
     p_sc.add_argument(
-        "--pending", "-p",
+        "--pending",
+        "-p",
         action="store_true",
         help="Show only pending games",
     )
-    p_sc.add_argument(
-        "--team", "-t", help="Filter by team name (partial match)"
-    )
+    p_sc.add_argument("--team", "-t", help="Filter by team name (partial match)")
     p_sc.add_argument(
         "--b2b",
         action="store_true",
@@ -229,13 +311,21 @@ def main() -> None:
     p_pr = subs.add_parser("predict", help="Predict final standings")
     p_pr.add_argument(
         "--html",
-        default=SCHEDULE_FILE,
-        help=f"Schedule HTML file (default: {SCHEDULE_FILE})",
+        default=None,
+        help="Schedule HTML file (files/<liganr>/spielplan.html)",
+    )
+    p_pr.add_argument(
+        "--liganr",
+        type=int,
+        help="Liga ID; uses files/<liganr>/ergebnisse.html + spielplan.html",
     )
     p_pr.set_defaults(func=cmd_predict)
 
-    p_top = subs.add_parser(
-        "top", help="Show top teams from current standings"
+    p_top = subs.add_parser("top", help="Show top teams from current standings")
+    p_top.add_argument(
+        "--liganr",
+        type=int,
+        help="Liga ID; uses files/<liganr>/ergebnisse.html",
     )
     p_top.add_argument(
         "-n",
@@ -246,10 +336,12 @@ def main() -> None:
     p_top.set_defaults(func=cmd_top)
 
     p_dl = subs.add_parser(
-        "download", help="Download results & schedule HTML",
+        "download",
+        help="Download results & schedule HTML",
     )
     p_dl.add_argument(
-        "liganr", type=int,
+        "liganr",
+        type=int,
         help="Liga ID (e.g. 51491)",
     )
     p_dl.set_defaults(func=cmd_download)

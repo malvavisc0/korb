@@ -36,10 +36,10 @@ uv sync
 uv run korb download 12345
 
 # View standings
-uv run korb standings
+uv run korb standings --liganr 12345
 
 # Predict the rest of the season
-uv run korb predict
+uv run korb predict --liganr 12345
 ```
 
 ---
@@ -68,12 +68,12 @@ After `uv sync`, the `korb` CLI is available inside the virtual environment. Use
 uv run korb download 12345
 ```
 
-Saves `ergebnisse.html` and `spielplan.html` into `files/`.
+Saves `ergebnisse.html` and `spielplan.html` into `files/<liganr>/`.
 
 ### `standings` — League table
 
 ```bash
-uv run korb standings
+uv run korb standings --liganr 12345
 ```
 
 ```
@@ -89,29 +89,29 @@ uv run korb standings
 
 ```bash
 # Basic results
-uv run korb team "Thunder"
+uv run korb team "Thunder" --liganr 12345
 
 # With bar chart + quality metrics for last 5 games
-uv run korb team "Thunder" --bars --last-k 5 --metrics
+uv run korb team "Thunder" --bars --last-k 5 --metrics --liganr 12345
 ```
 
 ### `schedule` — Game calendar
 
 ```bash
 # All upcoming games
-uv run korb schedule --pending
+uv run korb schedule --pending --liganr 12345
 
 # Filter by team + mark back-to-back ⚡ fixtures
-uv run korb schedule --team "Hawks" --pending --b2b
+uv run korb schedule --team "Hawks" --pending --b2b --liganr 12345
 
 # Include cancelled games
-uv run korb schedule --all
+uv run korb schedule --all --liganr 12345
 ```
 
 ### `predict` — Forecast final standings
 
 ```bash
-uv run korb predict
+uv run korb predict --liganr 12345
 ```
 
 Uses a multiplicative efficiency model with recency weighting, recent form blending, home advantage, and back-to-back fatigue modelling.
@@ -119,7 +119,7 @@ Uses a multiplicative efficiency model with recency weighting, recent form blend
 ### `top` — Quick leaderboard
 
 ```bash
-uv run korb top -n 5
+uv run korb top -n 5 --liganr 12345
 ```
 
 ### `--json` — Machine-readable output
@@ -127,11 +127,11 @@ uv run korb top -n 5
 Add `--json` before any subcommand to get JSON instead of tables:
 
 ```bash
-uv run korb --json standings
-uv run korb --json team "Hawks"
-uv run korb --json schedule --pending
-uv run korb --json predict
-uv run korb --json top -n 3
+uv run korb --json standings --liganr 12345
+uv run korb --json team "Hawks" --liganr 12345
+uv run korb --json schedule --pending --liganr 12345
+uv run korb --json predict --liganr 12345
+uv run korb --json top -n 3 --liganr 12345
 ```
 
 ---
@@ -157,8 +157,8 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --results, -r RESULTS
-                        HTML results file path (default: files/ergebnisse.html)
+    --results, -r RESULTS
+                        HTML results file path (files/<liganr>/ergebnisse.html)
   --json                Output as JSON instead of formatted tables
 ```
 
@@ -166,10 +166,11 @@ options:
 <summary><code>standings --help</code></summary>
 
 ```
-usage: korb standings [-h]
+usage: korb standings [-h] [--liganr LIGANR]
 
 options:
-  -h, --help  show this help message and exit
+  -h, --help       show this help message and exit
+  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
 ```
 </details>
 
@@ -177,13 +178,14 @@ options:
 <summary><code>team --help</code></summary>
 
 ```
-usage: korb team [-h] [--bars] [--last-k LAST_K] [--metrics] name
+usage: korb team [-h] [--liganr LIGANR] [--bars] [--last-k LAST_K] [--metrics] name
 
 positional arguments:
   name             Team name (e.g., 'Thunder Academy')
 
 options:
   -h, --help       show this help message and exit
+  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
   --bars, -b       Show point differential bar chart
   --last-k LAST_K  Analyze only the most recent K games (newest-first)
   --metrics        Show win-rate + margin quality metrics (respects --last-k)
@@ -194,11 +196,12 @@ options:
 <summary><code>schedule --help</code></summary>
 
 ```
-usage: korb schedule [-h] [--html HTML] [--all] [--pending] [--team TEAM] [--b2b]
+usage: korb schedule [-h] [--html HTML] [--liganr LIGANR] [--all] [--pending] [--team TEAM] [--b2b]
 
 options:
   -h, --help       show this help message and exit
-  --html HTML      Schedule HTML file (default: files/spielplan.html)
+  --html HTML      Schedule HTML file (files/<liganr>/spielplan.html)
+  --liganr LIGANR  Liga ID; uses files/<liganr>/spielplan.html
   --all, -a        Show cancelled games
   --pending, -p    Show only pending games
   --team, -t TEAM  Filter by team name (partial match)
@@ -210,11 +213,12 @@ options:
 <summary><code>predict --help</code></summary>
 
 ```
-usage: korb predict [-h] [--html HTML]
+usage: korb predict [-h] [--html HTML] [--liganr LIGANR]
 
 options:
   -h, --help   show this help message and exit
-  --html HTML  Schedule HTML file (default: files/spielplan.html)
+  --html HTML  Schedule HTML file (files/<liganr>/spielplan.html)
+  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html + spielplan.html
 ```
 </details>
 
@@ -222,10 +226,11 @@ options:
 <summary><code>top --help</code></summary>
 
 ```
-usage: korb top [-h] [-n N]
+usage: korb top [-h] [-n N] [--liganr LIGANR]
 
 options:
   -h, --help  show this help message and exit
+  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
   -n N        How many teams to show (default: 3)
 ```
 </details>

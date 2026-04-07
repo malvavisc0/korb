@@ -30,9 +30,12 @@ class GameResult:
     def to_dict(self) -> dict:
         """Serializable dict including computed properties."""
         return {
-            "opponent": self.opponent, "home_away": self.home_away,
-            "our_score": self.our_score, "opp_score": self.opp_score,
-            "result": self.result, "diff": self.diff,
+            "opponent": self.opponent,
+            "home_away": self.home_away,
+            "our_score": self.our_score,
+            "opp_score": self.opp_score,
+            "result": self.result,
+            "diff": self.diff,
         }
 
 
@@ -80,29 +83,27 @@ def _game_to_result(game: Game, is_home: bool) -> GameResult:
     )
 
 
-def get_team_results(
-    team_name: str, filepath: Optional[str] = None
-) -> list[GameResult]:
+def get_team_results(team_name: str, filepath: str) -> tuple[list[GameResult], str]:
     """Get all game results for a team (case-insensitive partial match).
 
     Args:
         team_name: Team name to search for (partial match).
-        filepath: Optional HTML results file path; uses default if None.
+        filepath: HTML results file path.
 
     Returns:
-        List of GameResult objects for matching games.
+        Tuple of (game results, league_name).
     """
-    kwargs = {"filepath": filepath} if filepath else {}
+    games, league_name = read_games(filepath)
     results: list[GameResult] = []
     name_lower = team_name.lower()
 
-    for game in read_games(**kwargs):
+    for game in games:
         if name_lower in game.home.lower():
             results.append(_game_to_result(game, is_home=True))
         elif name_lower in game.away.lower():
             results.append(_game_to_result(game, is_home=False))
 
-    return results
+    return results, league_name
 
 
 def _sparkline_char(result: str) -> str:
@@ -110,24 +111,26 @@ def _sparkline_char(result: str) -> str:
     return {"W": "█", "L": "▄", "D": "─"}.get(result, " ")
 
 
-def print_results(team_name: str, results: list[GameResult]) -> None:
+def print_results(
+    team_name: str,
+    results: list[GameResult],
+    league_name: str = "Basketball League",
+) -> None:
     """Print formatted results table with summary.
 
     Args:
         team_name: Team name for header display.
         results: List of game results to print.
+        league_name: League name for header.
     """
-    print_header(f"Team: {team_name}")
+    print_header(f"Team: {team_name}", league_name)
 
     if not results:
         print(f"No results found for '{team_name}'")
         return
 
     ow = max(3, max(len(r.opponent) for r in results))
-    hdr = (
-        f"{'Opp':<{ow}}  {'H/A':>4}  "
-        f"{'Score':>10}  {'Diff':>6}  {'Result':>6}"
-    )
+    hdr = f"{'Opp':<{ow}}  {'H/A':>4}  " f"{'Score':>10}  {'Diff':>6}  {'Result':>6}"
     print(hdr)
     print("-" * len(hdr))
 
@@ -216,7 +219,7 @@ def print_bars(results: list[GameResult]) -> None:
         else:
             labels.append(f"-{round(max_neg * (r - mid) / half)}")
 
-    lw = max(len(lb) for lb in labels[first:last + 1])
+    lw = max(len(lb) for lb in labels[first : last + 1])
 
     for r in range(first, last + 1):
         sep = "┤" if r == mid else "│"
@@ -229,9 +232,7 @@ def print_bars(results: list[GameResult]) -> None:
     print(" " * (lw + 2) + " " + nums)
 
 
-def _last_k(
-    results: list[GameResult], last_k: Optional[int]
-) -> list[GameResult]:
+def _last_k(results: list[GameResult], last_k: Optional[int]) -> list[GameResult]:
     """Return the most recent K games.
 
     `read_games()` yields games newest-first. `get_team_results()` preserves
@@ -281,7 +282,9 @@ def _compute_metrics(results: list[GameResult]) -> dict[str, float]:
 
 
 def print_metrics(
-    results: list[GameResult], last_k: Optional[int] = None
+    results: list[GameResult],
+    league_name: str = "Basketball League",
+    last_k: Optional[int] = None,
 ) -> None:
     """Print computed metrics for the (optionally filtered) result list."""
 

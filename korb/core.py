@@ -11,16 +11,13 @@ from datetime import datetime
 from html.parser import HTMLParser
 from typing import Final, Optional
 
-HTML_FILE: Final[str] = "files/ergebnisse.html"
 DATE_FMT: Final[str] = "%d.%m.%Y %H:%M"
+_LEAGUE_FALLBACK: Final[str] = "Basketball League"
 
 # Regex for league name in DBB HTML titles like:
 # "Ergebnisse - MFR U12 mix Bezirksliga Nord (U12 ...)"
 # "Spielplan - MFR U12 mix Bezirksliga Nord (U12 ...)"
-_TITLE_RE = re.compile(
-    r"(?:Ergebnisse|Spielplan)\s*-\s*(.+?)\s*\("
-)
-_league_name: str = ""
+_TITLE_RE = re.compile(r"(?:Ergebnisse|Spielplan)\s*-\s*(.+?)\s*\(")
 
 
 @dataclass
@@ -102,9 +99,7 @@ class _HTMLResultsParser(HTMLParser):
         self._current_cell = ""
         self._row_cancelled = False
 
-    def handle_starttag(
-        self, tag: str, attrs: list[tuple[str, Optional[str]]]
-    ) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
         if tag == "td":
             if self._td_depth == 0:
                 self._in_td = True
@@ -155,7 +150,20 @@ class _HTMLResultsParser(HTMLParser):
         )
 
 
-def read_games(filepath: str = HTML_FILE) -> list[Game]:
+def extract_league_name(html: str) -> str:
+    """Extract league name from DBB HTML title tag.
+
+    Args:
+        html: Raw HTML content.
+
+    Returns:
+        League name string, or fallback if not found.
+    """
+    m = _TITLE_RE.search(html)
+    return m.group(1).strip() if m else _LEAGUE_FALLBACK
+
+
+def read_games(filepath: str) -> tuple[list[Game], str]:
     """Read all valid games from HTML results file.
 
     Skips forfeited games (struck-through rows) and incomplete rows.
@@ -164,39 +172,29 @@ def read_games(filepath: str = HTML_FILE) -> list[Game]:
         filepath: Path to HTML results file.
 
     Returns:
-        List of Game objects sorted by date (newest first).
+        Tuple of (games sorted newest-first, league_name).
     """
     content = read_file_safe(filepath)
-    _set_league_name(content)
+    league_name = extract_league_name(content)
     parser = _HTMLResultsParser()
     parser.feed(content)
     parser.games.sort(key=lambda g: g.date, reverse=True)
-    return parser.games
+    return parser.games, league_name
 
 
-def _set_league_name(html: str) -> None:
-    """Extract and cache league name from HTML title (first win)."""
-    global _league_name
-    if _league_name:
-        return
-    m = _TITLE_RE.search(html)
-    if m:
-        _league_name = m.group(1).strip()
-
-
-def get_league_name() -> str:
-    """Return the cached league name."""
-    return _league_name or "Basketball League"
-
-
-def print_header(subtitle: str, width: int = 70) -> None:
+def print_header(
+    subtitle: str,
+    league_name: str = _LEAGUE_FALLBACK,
+    width: int = 70,
+) -> None:
     """Print a unified section header.
 
     Args:
         subtitle: Section subtitle to display.
+        league_name: League name to include in header.
         width: Minimum header width in characters.
     """
-    title = f"{subtitle} — {get_league_name()}"
+    title = f"{subtitle} — {league_name}"
     w = max(width, len(title) + 4)
     print(f"\n{'=' * w}")
     print(f"  {title}")

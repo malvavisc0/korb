@@ -3,9 +3,10 @@
 Calculates and displays standings with points, differentials, and averages.
 Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 """
+
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Final, Optional
+from typing import Final
 
 from korb.core import Game, print_header, read_games
 
@@ -17,6 +18,7 @@ DRAW_PTS: Final[int] = 1
 @dataclass
 class TeamStats:
     """Accumulated statistics for one team."""
+
     gp: int = 0
     w: int = 0
     l: int = 0
@@ -47,9 +49,15 @@ class TeamStats:
     def to_dict(self) -> dict:
         """Serializable dict including computed properties."""
         return {
-            "gp": self.gp, "w": self.w, "l": self.l, "d": self.d,
-            "pf": self.pf, "pa": self.pa, "diff": self.diff,
-            "pts": self.pts, "avg_pf": round(self.avg_pf, 1),
+            "gp": self.gp,
+            "w": self.w,
+            "l": self.l,
+            "d": self.d,
+            "pf": self.pf,
+            "pa": self.pa,
+            "diff": self.diff,
+            "pts": self.pts,
+            "avg_pf": round(self.avg_pf, 1),
             "avg_pa": round(self.avg_pa, 1),
         }
 
@@ -57,6 +65,7 @@ class TeamStats:
 @dataclass
 class Standing:
     """Complete standing entry for a team."""
+
     name: str
     stats: TeamStats
 
@@ -65,24 +74,24 @@ class Standing:
         return {"name": self.name, **self.stats.to_dict()}
 
 
-def calculate_standings(filepath: Optional[str] = None) -> list[Standing]:
+def calculate_standings(filepath: str) -> tuple[list[Standing], str]:
     """Calculate league standings from game results.
 
     Args:
-        filepath: Optional HTML results file path; uses default if None.
+        filepath: HTML results file path.
 
     Returns:
-        List of Standing objects sorted by pts, diff, pf.
+        Tuple of (standings sorted by pts/diff/pf, league_name).
     """
-    kwargs = {"filepath": filepath} if filepath else {}
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
+    games, league_name = read_games(filepath)
 
-    for game in read_games(**kwargs):
+    for game in games:
         _update_stats(teams, game)
 
     standings = [Standing(name, stats) for name, stats in teams.items()]
     standings.sort(key=lambda s: (-s.stats.pts, -s.stats.diff, -s.stats.pf))
-    return standings
+    return standings, league_name
 
 
 def _update_stats(teams: dict[str, TeamStats], game: Game) -> None:
@@ -114,13 +123,17 @@ def _update_stats(teams: dict[str, TeamStats], game: Game) -> None:
         away.d += 1
 
 
-def print_table(standings: list[Standing]) -> None:
+def print_table(
+    standings: list[Standing],
+    league_name: str = "Basketball League",
+) -> None:
     """Print formatted standings table.
 
     Args:
         standings: List of Standing objects to display.
+        league_name: League name for header.
     """
-    print_header("Standings")
+    print_header("Standings", league_name)
 
     if not standings:
         print("No standings data.")

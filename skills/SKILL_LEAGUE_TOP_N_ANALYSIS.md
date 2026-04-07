@@ -7,7 +7,7 @@ Goal: produce an evidence-based report that answers **who leads now**, **why the
 ## Prerequisites
 
 - Python 3 available as `python3`
-- HTML data files present (results + schedule) — run `python3 -m korb download <liga_id>` to fetch them
+- HTML data files present (results + schedule) — run `uv run korb download <liga_id>` to fetch them
 - The `korb` package in the workspace with subcommands: `standings`, `team`, `schedule`, `predict`, `top`, `download`
 - Supports `--json` flag for machine-readable output on all subcommands
 
@@ -16,20 +16,27 @@ Goal: produce an evidence-based report that answers **who leads now**, **why the
 | Variable | Default | Description |
 |---|---|---|
 | `N` | `3` | Number of top teams to analyse |
-| `LIGA_ID` | — | Liga ID from the DBB URL (used by `download` command) |
-| `RESULTS_DIR` | `files` | Directory containing `ergebnisse.html` and `spielplan.html` |
+| `LIGA_ID` | — | Liga ID from the DBB URL (used by `download` + to locate `files/<LIGA_ID>/...`) |
+| `REPORT_FILE` | `topn_report.md` | Output markdown report filename (path relative to workspace) |
+| `LANGUAGE` | `en` | Report language: `en` (English), `de` (German), `es` (Spanish) |
+| `RESULTS_DIR` | `files/<LIGA_ID>` | Directory containing `ergebnisse.html` and `spielplan.html` |
 
 ---
 
 ## Phase 0 — Download fresh data (if needed)
 
-Check whether `files/ergebnisse.html` and `files/spielplan.html` exist and are recent. If not, download them:
+> **Missing inputs rule.** If `LIGA_ID`, `REPORT_FILE`, or `LANGUAGE` are not provided by the user, ask the user before continuing:
+> 1) `LIGA_ID` (Liga ID)
+> 2) `REPORT_FILE` (output filename/path)
+> 3) `LANGUAGE` (`en`, `de`, `es`)
+
+Check whether `files/<LIGA_ID>/ergebnisse.html` and `files/<LIGA_ID>/spielplan.html` exist and are recent. If not, download them:
 
 ```bash
-python3 -m korb download <LIGA_ID>
+uv run korb download <LIGA_ID>
 ```
 
-This fetches both results and schedule HTML from basketball-bund.net and saves them into `files/`. Skip this phase if the data files are already up to date.
+This fetches both results and schedule HTML from basketball-bund.net and saves them into `files/<LIGA_ID>/`. Skip this phase if the data files are already up to date.
 
 ---
 
@@ -38,7 +45,7 @@ This fetches both results and schedule HTML from basketball-bund.net and saves t
 Run:
 
 ```bash
-python3 -m korb standings
+uv run korb standings --liganr <LIGA_ID>
 ```
 
 Record the **top N teams** by rank. For each, capture:
@@ -64,10 +71,10 @@ Store the N team names for all subsequent steps. Use **partial name tokens** tha
 For each of the N teams, run:
 
 ```bash
-python3 -m korb team "<PARTIAL_NAME>" --bars --metrics --last-k 5
+uv run korb team "<PARTIAL_NAME>" --bars --metrics --last-k 5 --liganr <LIGA_ID>
 ```
 
-> **Tip:** Add `--json` for structured data: `python3 -m korb --json team "<PARTIAL_NAME>"`
+> **Tip:** Add `--json` for structured data: `uv run korb --json team "<PARTIAL_NAME>"`
 
 Extract per team:
 
@@ -146,11 +153,11 @@ Momentum rules:
 Run the global pending query, then per-team:
 
 ```bash
-python3 -m korb schedule --pending
-python3 -m korb schedule --pending --team "<PARTIAL_NAME>"
+uv run korb schedule --pending --liganr <LIGA_ID>
+uv run korb schedule --pending --team "<PARTIAL_NAME>" --liganr <LIGA_ID>
 ```
 
-> **Date-sensitivity warning.** `filter_schedule()` compares against `datetime.now()`. If the season data is historical, `--pending` may return zero games. In that case, run `python3 -m korb schedule` without `--pending` and manually cross-reference.
+> **Date-sensitivity warning.** `filter_schedule()` compares against `datetime.now()`. If the season data is historical, `--pending` may return zero games. In that case, run `uv run korb schedule` without `--pending` and manually cross-reference.
 
 Classify each pending game as:
 
@@ -168,10 +175,18 @@ Control-of-finish heuristic:
 
 ## Phase 4 — Prediction
 
-Run:
+> **Season-finalized check.** Before running predictions, verify the season is still active:
+>
+> ```bash
+> uv run korb schedule --pending --liganr <LIGA_ID>
+> ```
+>
+> If no pending games are listed, the season is finalized. **Skip this phase** and note in the report that predictions are unavailable because the season has concluded.
+
+Run (only if season is active):
 
 ```bash
-python3 -m korb predict
+uv run korb predict --liganr <LIGA_ID>
 ```
 
 ### Model features to reference
@@ -199,6 +214,9 @@ Reconciliation checks:
 ## Phase 5 — Write the report
 
 Produce a markdown report file. **Every section must include at least one ASCII graph or visual.** Use the graph templates below.
+
+- Write headings and narrative in the selected `LANGUAGE` (`en`/`de`/`es`).
+- Save to the requested `REPORT_FILE` (overwrite if it already exists).
 
 ### Report structure
 
@@ -370,8 +388,11 @@ flowchart TD
     D --> E[Build comparison tables and head-to-head matrix]
     E --> F[Analyse momentum from last 5 games]
     F --> G[Run pending schedule per team + classify risk]
-    G --> H[Run predict — compare model vs evidence]
-    H --> I[Write report with ASCII graphs in every section]
+    G --> H{Season finalized?}
+    H -->|Yes| H1[Skip prediction - note in report]
+    H -->|No| I[Run predict — compare model vs evidence]
+    I --> J[Write report with ASCII graphs in every section]
+    H1 --> J
 ```
 
 ## Quality checklist
@@ -381,6 +402,7 @@ Before finalising the report, verify:
 - [ ] Every section has at least one ASCII graph or visual
 - [ ] All numbers are sourced from actual CLI output (no invented data)
 - [ ] Head-to-head section covers every pairing among top-N
+- [ ] Prediction phase skipped if season is finalized (with note in report)
 - [ ] Prediction caveats mention the model is deterministic
 - [ ] Back-to-back fatigue games are flagged in schedule risk
 - [ ] Last-5 form is explicitly stated for each team

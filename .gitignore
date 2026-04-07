@@ -7,7 +7,7 @@ dist/
 build/
 
 # Downloaded HTML data (keep folders via .gitkeep)
-files/*.html
+files/**/*.html
 
 # OS
 .DS_Store

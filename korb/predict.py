@@ -8,16 +8,10 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 
 from collections import defaultdict
 from math import exp, sqrt
-from typing import Optional
 
-from korb.core import HTML_FILE as RESULTS_FILE, read_games, Game
-from korb.standings import TeamStats, Standing
-from korb.schedule import (
-    HTML_FILE as SCHEDULE_FILE,
-    parse_schedule,
-    filter_schedule,
-    ScheduledGame,
-)
+from korb.core import Game, read_games
+from korb.schedule import ScheduledGame, filter_schedule, parse_schedule
+from korb.standings import Standing, TeamStats
 
 # Recency half-life in days
 RECENCY_HALF_LIFE = 60.0
@@ -49,12 +43,12 @@ def _recency_weight(game: Game, ref_ts: float) -> float:
 
 
 def calc_strength(
-    fp: Optional[str] = None,
+    fp: str,
 ) -> tuple[dict[str, TeamStats], dict[str, tuple[float, float]], float]:
     """Calculate team strength from completed games.
 
     Args:
-        fp: Optional HTML results file path; uses default if None.
+        fp: HTML results file path.
 
     Returns:
         Tuple of (teams, ratings, league_avg) where:
@@ -62,7 +56,7 @@ def calc_strength(
             ratings: dict mapping team to (off_rating, def_rating)
             league_avg: league-wide weighted avg points per game
     """
-    games = read_games(fp or RESULTS_FILE)
+    games, _ = read_games(fp)
     if not games:
         return {}, {}, 50.0
 
@@ -256,8 +250,8 @@ def predict_game(
 
 
 def predict_standings(
-    results_path: Optional[str] = None,
-    html_path: Optional[str] = None,
+    results_path: str,
+    html_path: str,
 ) -> tuple[list[Standing], list[tuple[ScheduledGame, str, int, int]]]:
     """Predict final standings based on remaining games.
 
@@ -265,15 +259,15 @@ def predict_standings(
     the schedule to avoid double-counting.
 
     Args:
-        results_path: Optional HTML results file path.
-        html_path: Optional HTML schedule file path.
+        results_path: HTML results file path.
+        html_path: HTML schedule file path.
 
     Returns:
         Tuple of (standings, predictions) where standings is the
         predicted final standings and predictions is a list of
         (game, winner, home_score, away_score) tuples.
     """
-    rp = results_path or RESULTS_FILE
+    rp = results_path
     teams_base, ratings, league_avg = calc_strength(rp)
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
 
@@ -288,14 +282,13 @@ def predict_standings(
         t.pa = st.pa
 
     # Build set of already-played matchups to avoid double-counting
-    played = read_games(rp)
+    played, _ = read_games(rp)
     played_keys: set[tuple[str, str, str]] = {
-        (g.home, g.away, g.date.strftime("%d.%m.%Y"))
-        for g in played
+        (g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played
     }
 
     # Pending games (exclude already-played)
-    schedule = parse_schedule(html_path or SCHEDULE_FILE)
+    schedule, _ = parse_schedule(html_path)
     pending = [
         g
         for g in filter_schedule(schedule, pending=True)
@@ -304,9 +297,7 @@ def predict_standings(
 
     # Sort chronologically and track last-game time per team for fatigue
     pending.sort(key=lambda g: g.date)
-    last_game_ts: dict[str, float] = {
-        g.home: g.date.timestamp() for g in played
-    }
+    last_game_ts: dict[str, float] = {g.home: g.date.timestamp() for g in played}
     for g in played:
         ts = g.date.timestamp()
         if ts > last_game_ts.get(g.away, 0):
