@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "A CLI toolkit for DBB basketball league analysis"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "pytest-cov>=7.1.0",
+]
 
 [project.scripts]
 korb = "korb.__main__:main"
@@ -17,7 +19,8 @@ build-backend = "hatchling.build"
 dev = [
     "black",
     "isort",
-    "flake8"
+    "flake8",
+    "pytest",
 ]
 
 [tool.black]
