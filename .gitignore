@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Downloaded HTML data (keep folders via .gitkeep)
+files/*.html
+
+# OS
+.DS_Store
