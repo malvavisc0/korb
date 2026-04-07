@@ -271,15 +271,14 @@ The `predict` command estimates final standings using a **multiplicative efficie
 
 ## 🧠 Skills
 
-The `skills/` directory contains **reusable AI skill definitions** — structured prompts that can be loaded by an AI assistant (e.g. Roo/Cline) to perform multi-step analysis workflows using the CLI.
+The `skills/` directory contains **reusable AI skill definitions** — structured prompts that can be loaded by an AI assistant (e.g. Roo/Cline) to run analysis workflows using the CLI.
 
-| Skill | Description |
-|---|---|
-| [`SKILL_LEAGUE_TOP_N_ANALYSIS.md`](skills/SKILL_LEAGUE_TOP_N_ANALYSIS.md) | Automated top-N team deep-dive: pulls standings, per-team profiles, schedule risk, and predictions into an evidence-based report with ASCII graphs |
+| Skill | Output | Description |
+|---|---|---|
+| [`SKILL_TEAM_ANALYSIS.md`](skills/SKILL_TEAM_ANALYSIS.md) | Paragraph | Short team summary (position, identity, form, outlook) — ready for a webpage card |
+| [`SKILL_LEAGUE_TOP_N_ANALYSIS.md`](skills/SKILL_LEAGUE_TOP_N_ANALYSIS.md) | Table + paragraph | Predicted final standings table with a brief explanation |
 
-Skills define **phases** (identify top teams → pull game profiles → compare → check schedule risk → predict → write report) and specify exactly which CLI commands to run, what data to extract, and how to structure the output.
-
-To use a skill, point your AI assistant at the markdown file or load it as a skill definition.
+Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output directly (no file saved). To use a skill, point your AI assistant at the markdown file or load it as a skill definition.
 
 ---
 
