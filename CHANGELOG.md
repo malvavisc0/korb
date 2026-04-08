@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] — 2026-04-08
+
+### Changed
+
+- Download requests now use browser-spoofing headers (Chrome 131 fingerprint) instead of the plain `korb/<version>` User-Agent to avoid basic bot detection.
+- Added `gzip`/`deflate` response decompression to match the advertised `Accept-Encoding`.
+- Added a random 0.5–1.5 s delay between consecutive HTTP requests to avoid rate-limit triggers.
+
+---
+
 ## [0.2.0] — 2026-04-08
 
 ### Changed

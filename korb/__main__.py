@@ -5,10 +5,15 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 """
 
 import argparse
+import gzip
+import http.client
 import json
+import random
 import sys
+import time
 import urllib.error
 import urllib.request
+import zlib
 from pathlib import Path
 
 from . import __version__
@@ -210,6 +215,56 @@ _SCHEDULE_URL = (
 )
 
 
+_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Accept": (
+        "text/html,application/xhtml+xml,application/xml;"
+        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+    ),
+    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Sec-CH-UA": '"Chromium";v="131", "Not_A Brand";v="24"',
+    "Sec-CH-UA-Mobile": "?0",
+    "Sec-CH-UA-Platform": '"Windows"',
+    "DNT": "1",
+    "Referer": "https://www.basketball-bund.net/",
+}
+
+# Minimum / maximum pause (seconds) between consecutive HTTP requests
+# to avoid triggering rate-limiters.
+_DELAY_MIN = 1.0
+_DELAY_MAX = 3.0
+
+
+def _read_response(resp: http.client.HTTPResponse) -> bytes:
+    """Read and decompress an HTTP response body.
+
+    Handles ``gzip`` and ``deflate`` Content-Encoding transparently so
+    the caller always receives raw bytes.
+    """
+    raw = resp.read()
+    encoding = resp.headers.get("Content-Encoding", "").strip().lower()
+    if encoding == "gzip":
+        return gzip.decompress(raw)
+    if encoding == "deflate":
+        # deflate may be raw-deflate or zlib-wrapped; try both.
+        try:
+            return zlib.decompress(raw)
+        except zlib.error:
+            return zlib.decompress(raw, -zlib.MAX_WBITS)
+    return raw
+
+
 def _download(ligaid: int) -> None:
     """Download results & schedule HTML for a league.
 
@@ -224,14 +279,20 @@ def _download(ligaid: int) -> None:
         (_RESULTS_URL.format(liga_id=ligaid), out / "ergebnisse.html"),
         (_SCHEDULE_URL.format(liga_id=ligaid), out / "spielplan.html"),
     ]
-    for url, dest in targets:
+    for i, (url, dest) in enumerate(targets):
+        if i > 0:
+            time.sleep(random.uniform(_DELAY_MIN, _DELAY_MAX))
         print(
             f"Downloading {dest.name} ...",
             end=" ",
             flush=True,
         )
         try:
-            urllib.request.urlretrieve(url, dest)
+            req = urllib.request.Request(url, headers=_HEADERS)
+            with urllib.request.urlopen(req) as resp:
+                data = _read_response(resp)
+                with open(dest, "wb") as f:
+                    f.write(data)
             print("OK")
         except urllib.error.URLError as e:
             print(f"FAILED: {e}", file=sys.stderr)
