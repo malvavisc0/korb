@@ -25,7 +25,7 @@ Produce a **markdown table** of predicted final standings (optionally limited to
 Check whether `files/<LIGA_ID>/ergebnisse.html` and `files/<LIGA_ID>/spielplan.html` exist. If not:
 
 ```bash
-uv run korb download <LIGA_ID>
+uv run korb --ligaid <LIGA_ID> download
 ```
 
 ---
@@ -33,7 +33,7 @@ uv run korb download <LIGA_ID>
 ## Step 2 — Read current standings
 
 ```bash
-uv run korb --json standings --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> standings
 ```
 
 Store the result list as `standings_json`.
@@ -45,7 +45,7 @@ Each entry has: `name`, `w`, `l`, `d`, `pts`, `diff`, `avg_pf`, `avg_pa`, etc.
 ## Step 3 — Check whether the season is already finalized
 
 ```bash
-uv run korb --json schedule --pending --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> schedule --pending
 ```
 
 Store the returned list as `pending_games`.
@@ -58,7 +58,7 @@ Store the returned list as `pending_games`.
 ## Step 4 — Run prediction (only if season is active)
 
 ```bash
-uv run korb --json predict --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> predict
 ```
 
 Extract `pred_json["standings"]` as `final_standings_json`.

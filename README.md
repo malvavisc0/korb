@@ -26,20 +26,34 @@ A zero-dependency Python CLI that parses HTML from the **DBB** (Deutscher Basket
 
 ---
 
+## Finding your Liga ID
+
+The `--ligaid` value comes from the `liga_id` parameter in the DBB league URL:
+
+```
+https://www.basketball-bund.net/index.jsp?Action=103&liga_id=51187
+                                                           ^^^^^
+                                                           this is your liga ID
+```
+
+Copy the number after `liga_id=` and pass it to `--ligaid`.
+
+---
+
 ## Quick Start
 
 ```bash
 # Install with uv
 uv sync
 
-# Download league data (liga_id from the DBB URL)
-uv run korb download 12345
+# Download league data
+uv run korb --ligaid 51187 download
 
 # View standings
-uv run korb standings --liganr 12345
+uv run korb --ligaid 51187 standings
 
-# Predict the rest of the season
-uv run korb predict --liganr 12345
+# Download fresh data + predict in one go
+uv run korb --ligaid 51187 --download predict
 ```
 
 ---
@@ -65,15 +79,15 @@ After `uv sync`, the `korb` CLI is available inside the virtual environment. Use
 
 ```bash
 # Download results + schedule for a league
-uv run korb download 12345
+uv run korb --ligaid 12345 download
 ```
 
-Saves `ergebnisse.html` and `spielplan.html` into `files/<liganr>/`.
+Saves `ergebnisse.html` and `spielplan.html` into `files/<ligaid>/`.
 
 ### `standings` — League table
 
 ```bash
-uv run korb standings --liganr 12345
+uv run korb --ligaid 12345 standings
 ```
 
 ```
@@ -89,29 +103,29 @@ uv run korb standings --liganr 12345
 
 ```bash
 # Basic results
-uv run korb team "Thunder" --liganr 12345
+uv run korb --ligaid 12345 team "Thunder"
 
 # With bar chart + quality metrics for last 5 games
-uv run korb team "Thunder" --bars --last-k 5 --metrics --liganr 12345
+uv run korb --ligaid 12345 team "Thunder" --bars --last-k 5 --metrics
 ```
 
 ### `schedule` — Game calendar
 
 ```bash
 # All upcoming games
-uv run korb schedule --pending --liganr 12345
+uv run korb --ligaid 12345 schedule --pending
 
 # Filter by team + mark back-to-back ⚡ fixtures
-uv run korb schedule --team "Hawks" --pending --b2b --liganr 12345
+uv run korb --ligaid 12345 schedule --team "Hawks" --pending --b2b
 
 # Include cancelled games
-uv run korb schedule --all --liganr 12345
+uv run korb --ligaid 12345 schedule --all
 ```
 
 ### `predict` — Forecast final standings
 
 ```bash
-uv run korb predict --liganr 12345
+uv run korb --ligaid 12345 predict
 ```
 
 Uses a multiplicative efficiency model with recency weighting, recent form blending, home advantage, and back-to-back fatigue modelling.
@@ -119,7 +133,17 @@ Uses a multiplicative efficiency model with recency weighting, recent form blend
 ### `top` — Quick leaderboard
 
 ```bash
-uv run korb top -n 5 --liganr 12345
+uv run korb --ligaid 12345 top -n 5
+```
+
+### `--download` — Fetch fresh data before any command
+
+```bash
+# Download + show standings in one step
+uv run korb --ligaid 12345 --download standings
+
+# Download + predict
+uv run korb --ligaid 12345 -d predict
 ```
 
 ### `--json` — Machine-readable output
@@ -127,11 +151,11 @@ uv run korb top -n 5 --liganr 12345
 Add `--json` before any subcommand to get JSON instead of tables:
 
 ```bash
-uv run korb --json standings --liganr 12345
-uv run korb --json team "Hawks" --liganr 12345
-uv run korb --json schedule --pending --liganr 12345
-uv run korb --json predict --liganr 12345
-uv run korb --json top -n 3 --liganr 12345
+uv run korb --json --ligaid 12345 standings
+uv run korb --json --ligaid 12345 team "Hawks"
+uv run korb --json --ligaid 12345 schedule --pending
+uv run korb --json --ligaid 12345 predict
+uv run korb --json --ligaid 12345 top -n 3
 ```
 
 ---
@@ -141,8 +165,9 @@ uv run korb --json top -n 3 --liganr 12345
 ```
 $ uv run korb --help
 
-usage: korb [-h] [--results RESULTS] [--json]
-              {standings,team,schedule,predict,top,download} ...
+usage: korb [-h] [--version] [--results RESULTS] [--schedule SCHEDULE]
+            [--json] [--ligaid LIGAID] [--download]
+            {standings,team,schedule,predict,top,download} ...
 
 Basketball league analysis tools
 
@@ -152,25 +177,28 @@ positional arguments:
     team                Display results for a team
     schedule            Display game schedule
     predict             Predict final standings
-    top                 Show top teams from current standings
+    top                 Show top teams from standings
     download            Download results & schedule HTML
 
 options:
   -h, --help            show this help message and exit
-    --results, -r RESULTS
-                        HTML results file path (files/<liganr>/ergebnisse.html)
+  --version, -V         show program's version number and exit
+  --results, -r RESULTS HTML results file path
+  --schedule, -s SCHEDULE
+                        HTML schedule file path
   --json                Output as JSON instead of formatted tables
+  --ligaid, -l LIGAID  Liga ID (e.g. 51491)
+  --download, -d        Download latest data before running the command
 ```
 
 <details>
 <summary><code>standings --help</code></summary>
 
 ```
-usage: korb standings [-h] [--liganr LIGANR]
+usage: korb standings [-h]
 
 options:
-  -h, --help       show this help message and exit
-  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
+  -h, --help  show this help message and exit
 ```
 </details>
 
@@ -178,17 +206,16 @@ options:
 <summary><code>team --help</code></summary>
 
 ```
-usage: korb team [-h] [--liganr LIGANR] [--bars] [--last-k LAST_K] [--metrics] name
+usage: korb team [-h] [--bars] [--last-k LAST_K] [--metrics] name
 
 positional arguments:
-  name             Team name (e.g., 'Thunder Academy')
+  name             Team name (e.g., 'TV 1877 Lauf')
 
 options:
   -h, --help       show this help message and exit
-  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
   --bars, -b       Show point differential bar chart
-  --last-k LAST_K  Analyze only the most recent K games (newest-first)
-  --metrics        Show win-rate + margin quality metrics (respects --last-k)
+  --last-k LAST_K  Analyze only the most recent K games
+  --metrics        Show win-rate + margin quality metrics
 ```
 </details>
 
@@ -196,16 +223,14 @@ options:
 <summary><code>schedule --help</code></summary>
 
 ```
-usage: korb schedule [-h] [--html HTML] [--liganr LIGANR] [--all] [--pending] [--team TEAM] [--b2b]
+usage: korb schedule [-h] [--all] [--pending] [--team TEAM] [--b2b]
 
 options:
   -h, --help       show this help message and exit
-  --html HTML      Schedule HTML file (files/<liganr>/spielplan.html)
-  --liganr LIGANR  Liga ID; uses files/<liganr>/spielplan.html
   --all, -a        Show cancelled games
   --pending, -p    Show only pending games
   --team, -t TEAM  Filter by team name (partial match)
-  --b2b            Mark fixtures that include a back-to-back (≤36h)
+  --b2b            Mark back-to-back fixtures (≤36h)
 ```
 </details>
 
@@ -213,12 +238,10 @@ options:
 <summary><code>predict --help</code></summary>
 
 ```
-usage: korb predict [-h] [--html HTML] [--liganr LIGANR]
+usage: korb predict [-h]
 
 options:
-  -h, --help   show this help message and exit
-  --html HTML  Schedule HTML file (files/<liganr>/spielplan.html)
-  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html + spielplan.html
+  -h, --help  show this help message and exit
 ```
 </details>
 
@@ -226,11 +249,10 @@ options:
 <summary><code>top --help</code></summary>
 
 ```
-usage: korb top [-h] [-n N] [--liganr LIGANR]
+usage: korb top [-h] [-n N]
 
 options:
   -h, --help  show this help message and exit
-  --liganr LIGANR  Liga ID; uses files/<liganr>/ergebnisse.html
   -n N        How many teams to show (default: 3)
 ```
 </details>
@@ -239,10 +261,7 @@ options:
 <summary><code>download --help</code></summary>
 
 ```
-usage: korb download [-h] liganr
-
-positional arguments:
-  liganr      Liga ID (e.g. 12345)
+usage: korb download [-h]
 
 options:
   -h, --help  show this help message and exit
@@ -302,9 +321,9 @@ Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output dir
 
 **Requirements:** Python 3.10+ · [uv](https://docs.astral.sh/uv/) · No runtime dependencies
 
-> **Note:** Downloaded HTML files and `--liganr` paths resolve relative to your
-> current working directory (`files/<liganr>/`). Run `korb` from the project root
-> or pass explicit `--results` / `--html` paths.
+> **Note:** Downloaded HTML files and `--ligaid` paths resolve relative to your
+> current working directory (`files/<ligaid>/`). Run `korb` from the project root
+> or pass explicit `--results` / `--schedule` paths.
 
 ### Dev tools
 

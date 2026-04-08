@@ -25,7 +25,7 @@ Produce a **short paragraph** (3–5 sentences) describing a single basketball t
 Check whether `files/<LIGA_ID>/ergebnisse.html` and `files/<LIGA_ID>/spielplan.html` exist. If not:
 
 ```bash
-uv run korb download <LIGA_ID>
+uv run korb --ligaid <LIGA_ID> download
 ```
 
 ---
@@ -46,7 +46,7 @@ Because `korb team` accepts a partial team-name match, multiple teams may match 
 Run:
 
 ```bash
-uv run korb --json standings --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> standings
 ```
 
 From the selected team entry extract:
@@ -61,7 +61,7 @@ From the selected team entry extract:
 Run:
 
 ```bash
-uv run korb --json team "<TEAM_NAME>" --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> team "<TEAM_NAME>"
 ```
 
 Important: in JSON mode, the CLI returns **all matching games** and does **not** apply `--last-k` slicing or `--metrics` printing logic.
@@ -82,14 +82,14 @@ Compute:
 Check pending games:
 
 ```bash
-uv run korb --json schedule --pending --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> schedule --pending
 ```
 
 - If the returned list is empty: season is finalized → **skip** prediction.
 - If pending games exist: run prediction:
 
 ```bash
-uv run korb --json predict --liganr <LIGA_ID>
+uv run korb --json --ligaid <LIGA_ID> predict
 ```
 
 From `predict_json["standings"]` extract the team’s **predicted rank** as `index_in_list + 1`.

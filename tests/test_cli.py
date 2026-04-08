@@ -13,18 +13,18 @@ def _make_args(**kwargs) -> argparse.Namespace:
 
 class TestCmdStandings:
     def test_valid_file(self, ergebnisse_path, capsys):
-        args = _make_args(results=ergebnisse_path, liganr=None, json=False)
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=False)
         cmd_standings(args)
         captured = capsys.readouterr()
         assert "Standings" in captured.out
 
     def test_missing_file(self, tmp_path):
-        args = _make_args(results=str(tmp_path / "no.html"), liganr=None, json=False)
+        args = _make_args(results=str(tmp_path / "no.html"), ligaid=None, json=False)
         with pytest.raises(SystemExit):
             cmd_standings(args)
 
     def test_json_output(self, ergebnisse_path, capsys):
-        args = _make_args(results=ergebnisse_path, liganr=None, json=True)
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=True)
         cmd_standings(args)
         captured = capsys.readouterr()
         import json
@@ -38,7 +38,7 @@ class TestCmdTeam:
         args = _make_args(
             name="Alpha",
             results=ergebnisse_path,
-            liganr=None,
+            ligaid=None,
             json=False,
             bars=False,
             metrics=False,
@@ -52,7 +52,7 @@ class TestCmdTeam:
         args = _make_args(
             name="NonExistent",
             results=ergebnisse_path,
-            liganr=None,
+            ligaid=None,
             json=False,
             bars=False,
             metrics=False,
@@ -66,7 +66,7 @@ class TestCmdTeam:
         args = _make_args(
             name="Alpha",
             results=ergebnisse_path,
-            liganr=None,
+            ligaid=None,
             json=True,
             bars=False,
             metrics=False,
@@ -84,8 +84,8 @@ class TestCmdTeam:
 class TestCmdSchedule:
     def test_pending_filter(self, spielplan_path, capsys):
         args = _make_args(
-            html=spielplan_path,
-            liganr=None,
+            schedule=spielplan_path,
+            ligaid=None,
             all=False,
             pending=True,
             team=None,
@@ -98,8 +98,8 @@ class TestCmdSchedule:
 
     def test_team_filter(self, spielplan_path, capsys):
         args = _make_args(
-            html=spielplan_path,
-            liganr=None,
+            schedule=spielplan_path,
+            ligaid=None,
             all=False,
             pending=False,
             team="Alpha",
@@ -112,8 +112,8 @@ class TestCmdSchedule:
 
     def test_json_output(self, spielplan_path, capsys):
         args = _make_args(
-            html=spielplan_path,
-            liganr=None,
+            schedule=spielplan_path,
+            ligaid=None,
             all=False,
             pending=False,
             team=None,
@@ -136,8 +136,8 @@ class TestCmdPredict:
     ):
         args = _make_args(
             results=ergebnisse_path,
-            html=spielplan_finalized_path,
-            liganr=None,
+            schedule=spielplan_finalized_path,
+            ligaid=None,
             json=False,
         )
         with pytest.raises(SystemExit):
@@ -146,8 +146,8 @@ class TestCmdPredict:
     def test_normal_execution(self, ergebnisse_path, spielplan_path, capsys):
         args = _make_args(
             results=ergebnisse_path,
-            html=spielplan_path,
-            liganr=None,
+            schedule=spielplan_path,
+            ligaid=None,
             json=False,
         )
         cmd_predict(args)

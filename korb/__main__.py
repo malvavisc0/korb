@@ -32,13 +32,13 @@ def cmd_standings(args: argparse.Namespace) -> None:
     """Handle 'standings' subcommand."""
     fp = args.results
     if fp is None:
-        if args.liganr is None:
+        if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --liganr LIGANR " "for standings.",
+                "Error: pass --results PATH or --ligaid LIGAID " "for standings.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
     standings, league_name = calculate_standings(fp)
     if args.json:
@@ -51,13 +51,13 @@ def cmd_team(args: argparse.Namespace) -> None:
     """Handle 'team' subcommand."""
     fp = args.results
     if fp is None:
-        if args.liganr is None:
+        if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --liganr LIGANR " "for team results.",
+                "Error: pass --results PATH or --ligaid LIGAID " "for team results.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
     results, league_name = get_team_results(args.name, fp)
     if args.json:
@@ -75,15 +75,15 @@ def cmd_team(args: argparse.Namespace) -> None:
 
 def cmd_schedule(args: argparse.Namespace) -> None:
     """Handle 'schedule' subcommand."""
-    html = args.html
+    html = args.schedule
     if html is None:
-        if args.liganr is None:
+        if args.ligaid is None:
             print(
-                "Error: pass --html PATH or --liganr LIGANR for schedule.",
+                "Error: pass --schedule PATH or --ligaid LIGAID for schedule.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        html = str(Path("files") / str(args.liganr) / "spielplan.html")
+        html = str(Path("files") / str(args.ligaid) / "spielplan.html")
 
     games, league_name = parse_schedule(html)
     filtered = filter_schedule(
@@ -98,16 +98,16 @@ def cmd_schedule(args: argparse.Namespace) -> None:
 def cmd_predict(args: argparse.Namespace) -> None:
     """Handle 'predict' subcommand."""
     rp = args.results
-    sp = args.html
+    sp = args.schedule
     if rp is None or sp is None:
-        if args.liganr is None:
+        if args.ligaid is None:
             print(
-                "Error: pass --results PATH and --html PATH, "
-                "or provide --liganr LIGANR.",
+                "Error: pass --results PATH and --schedule PATH, "
+                "or provide --ligaid LIGAID.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        base = Path("files") / str(args.liganr)
+        base = Path("files") / str(args.ligaid)
         rp = rp or str(base / "ergebnisse.html")
         sp = sp or str(base / "spielplan.html")
 
@@ -154,13 +154,13 @@ def cmd_top(args: argparse.Namespace) -> None:
 
     fp = args.results
     if fp is None:
-        if args.liganr is None:
+        if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --liganr LIGANR for top.",
+                "Error: pass --results PATH or --ligaid LIGAID for top.",
                 file=sys.stderr,
             )
             sys.exit(1)
-        fp = str(Path("files") / str(args.liganr) / "ergebnisse.html")
+        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
     standings, _league_name = calculate_standings(fp)
     top = standings[: args.n]
@@ -210,27 +210,43 @@ _SCHEDULE_URL = (
 )
 
 
-def cmd_download(args: argparse.Namespace) -> None:
-    """Handle 'download' subcommand."""
+def _download(ligaid: int) -> None:
+    """Download results & schedule HTML for a league.
+
+    Args:
+        ligaid: Liga ID on basketball-bund.net.
+    """
     out_root = Path("files")
     out_root.mkdir(exist_ok=True)
-
-    # New layout: keep per-league artifacts in their own subfolder.
-    # Example: files/<liganr>/ergebnisse.html + files/<liganr>/spielplan.html
-    out = out_root / str(args.liganr)
+    out = out_root / str(ligaid)
     out.mkdir(exist_ok=True)
     targets = [
-        (_RESULTS_URL.format(liga_id=args.liganr), out / "ergebnisse.html"),
-        (_SCHEDULE_URL.format(liga_id=args.liganr), out / "spielplan.html"),
+        (_RESULTS_URL.format(liga_id=ligaid), out / "ergebnisse.html"),
+        (_SCHEDULE_URL.format(liga_id=ligaid), out / "spielplan.html"),
     ]
     for url, dest in targets:
-        print(f"Downloading {dest.name} ...", end=" ", flush=True)
+        print(
+            f"Downloading {dest.name} ...",
+            end=" ",
+            flush=True,
+        )
         try:
             urllib.request.urlretrieve(url, dest)
             print("OK")
         except urllib.error.URLError as e:
             print(f"FAILED: {e}", file=sys.stderr)
             sys.exit(1)
+
+
+def cmd_download(args: argparse.Namespace) -> None:
+    """Handle 'download' subcommand."""
+    if args.ligaid is None:
+        print(
+            "Error: --ligaid is required for download.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    _download(args.ligaid)
 
 
 def main() -> None:
@@ -245,91 +261,105 @@ def main() -> None:
         "--results",
         "-r",
         default=None,
-        help="HTML results file path (files/<liganr>/ergebnisse.html)",
+        help="HTML results file path (files/<ligaid>/ergebnisse.html)",
+    )
+    parser.add_argument(
+        "--schedule",
+        "-s",
+        default=None,
+        help="HTML schedule file path (files/<ligaid>/spielplan.html)",
     )
     parser.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON instead of formatted tables",
     )
+    parser.add_argument(
+        "--ligaid",
+        "-l",
+        type=int,
+        default=None,
+        help="Liga ID (e.g. 51491); resolves file paths automatically",
+    )
+    parser.add_argument(
+        "--download",
+        "-d",
+        action="store_true",
+        help="Download latest data before running the command",
+    )
 
     subs = parser.add_subparsers(dest="command", required=True)
 
-    p_st = subs.add_parser("standings", help="Display league standings")
-    p_st.add_argument(
-        "--liganr",
-        type=int,
-        help="Liga ID; uses files/<liganr>/ergebnisse.html",
+    p_st = subs.add_parser(
+        "standings",
+        help="Display league standings",
     )
     p_st.set_defaults(func=cmd_standings)
 
-    p_tm = subs.add_parser("team", help="Display results for a team")
-    p_tm.add_argument("name", help="Team name (e.g., 'TV 1877 Lauf')")
-    p_tm.add_argument(
-        "--liganr",
-        type=int,
-        help="Liga ID; uses files/<liganr>/ergebnisse.html",
+    p_tm = subs.add_parser(
+        "team",
+        help="Display results for a team",
     )
     p_tm.add_argument(
-        "--bars", "-b", action="store_true", help="Show point differential bar chart"
+        "name",
+        help="Team name (e.g., 'TV 1877 Lauf')",
+    )
+    p_tm.add_argument(
+        "--bars",
+        "-b",
+        action="store_true",
+        help="Show point differential bar chart",
     )
     p_tm.add_argument(
         "--last-k",
         type=int,
         default=None,
-        help="Analyze only the most recent K games (newest-first)",
+        help="Analyze only the most recent K games",
     )
     p_tm.add_argument(
         "--metrics",
         action="store_true",
-        help="Show win-rate + margin quality metrics (respects --last-k)",
+        help="Show win-rate + margin quality metrics",
     )
     p_tm.set_defaults(func=cmd_team)
 
-    p_sc = subs.add_parser("schedule", help="Display game schedule")
-    p_sc.add_argument(
-        "--html",
-        default=None,
-        help="Schedule HTML file (files/<liganr>/spielplan.html)",
+    p_sc = subs.add_parser(
+        "schedule",
+        help="Display game schedule",
     )
     p_sc.add_argument(
-        "--liganr",
-        type=int,
-        help="Liga ID; uses files/<liganr>/spielplan.html",
+        "--all",
+        "-a",
+        action="store_true",
+        help="Show cancelled games",
     )
-    p_sc.add_argument("--all", "-a", action="store_true", help="Show cancelled games")
     p_sc.add_argument(
         "--pending",
         "-p",
         action="store_true",
         help="Show only pending games",
     )
-    p_sc.add_argument("--team", "-t", help="Filter by team name (partial match)")
+    p_sc.add_argument(
+        "--team",
+        "-t",
+        help="Filter by team name (partial match)",
+    )
     p_sc.add_argument(
         "--b2b",
         action="store_true",
-        help="Mark fixtures that include a back-to-back (≤36h)",
+        help="Mark back-to-back fixtures (≤36h)",
     )
     p_sc.set_defaults(func=cmd_schedule)
 
-    p_pr = subs.add_parser("predict", help="Predict final standings")
-    p_pr.add_argument(
-        "--html",
-        default=None,
-        help="Schedule HTML file (files/<liganr>/spielplan.html)",
-    )
-    p_pr.add_argument(
-        "--liganr",
-        type=int,
-        help="Liga ID; uses files/<liganr>/ergebnisse.html + spielplan.html",
+    p_pr = subs.add_parser(
+        "predict",
+        help="Predict final standings",
     )
     p_pr.set_defaults(func=cmd_predict)
 
-    p_top = subs.add_parser("top", help="Show top teams from current standings")
-    p_top.add_argument(
-        "--liganr",
-        type=int,
-        help="Liga ID; uses files/<liganr>/ergebnisse.html",
+    p_top = subs.add_parser(
+        "top",
+        help="Show top teams from standings",
     )
     p_top.add_argument(
         "-n",
@@ -343,14 +373,20 @@ def main() -> None:
         "download",
         help="Download results & schedule HTML",
     )
-    p_dl.add_argument(
-        "liganr",
-        type=int,
-        help="Liga ID (e.g. 51491)",
-    )
     p_dl.set_defaults(func=cmd_download)
 
     args = parser.parse_args()
+
+    # Pre-command download hook
+    if args.download and args.command != "download":
+        if args.ligaid is None:
+            print(
+                "Error: --download requires --ligaid.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        _download(args.ligaid)
+
     args.func(args)
 
 
