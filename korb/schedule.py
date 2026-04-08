@@ -264,7 +264,7 @@ def print_schedule(
             tag = f"{tag} ⚡"
 
         print(
-            f"{g.nr:<{nr_w}}  {g.day:>{day_w}}  "
+            f"{g.nr:<{nr_w}}  {tag:>{day_w}}  "
             f"{date_str:<{date_w}}  {home:<{home_w}}  "
             f"{away:<{away_w}}  {g.venue:<{venue_w}}"
         )

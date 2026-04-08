@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from . import __version__
 from .predict import predict_standings, print_predicted_standings, print_predictions
 from .schedule import (
     filter_schedule,
@@ -236,6 +237,9 @@ def main() -> None:
     """Entry point for CLI."""
     parser = argparse.ArgumentParser(
         prog="korb", description="Basketball league analysis tools"
+    )
+    parser.add_argument(
+        "--version", "-V", action="version", version=f"%(prog)s {__version__}"
     )
     parser.add_argument(
         "--results",

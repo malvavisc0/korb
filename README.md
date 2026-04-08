@@ -4,7 +4,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&amp;logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/uv-package%20manager-blueviolet?logo=uv" alt="uv">
   <img src="https://img.shields.io/badge/deps-zero-brightgreen" alt="Zero dependencies">
   <img src="https://img.shields.io/badge/platform-DBB%20JSP-orange" alt="DBB JSP">
@@ -301,6 +301,10 @@ Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output dir
 ```
 
 **Requirements:** Python 3.10+ · [uv](https://docs.astral.sh/uv/) · No runtime dependencies
+
+> **Note:** Downloaded HTML files and `--liganr` paths resolve relative to your
+> current working directory (`files/<liganr>/`). Run `korb` from the project root
+> or pass explicit `--results` / `--html` paths.
 
 ### Dev tools
 

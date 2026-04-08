@@ -297,13 +297,12 @@ def predict_standings(
 
     # Sort chronologically and track last-game time per team for fatigue
     pending.sort(key=lambda g: g.date)
-    last_game_ts: dict[str, float] = {g.home: g.date.timestamp() for g in played}
+    last_game_ts: dict[str, float] = {}
     for g in played:
         ts = g.date.timestamp()
-        if ts > last_game_ts.get(g.away, 0):
-            last_game_ts[g.away] = ts
-        if ts > last_game_ts.get(g.home, 0):
-            last_game_ts[g.home] = ts
+        for name in (g.home, g.away):
+            if ts > last_game_ts.get(name, 0):
+                last_game_ts[name] = ts
 
     threshold_s = FATIGUE_THRESHOLD_H * 3600
 
