@@ -16,9 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
-    "pytest-cov",
-]
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/malvavisc0/korb"
@@ -38,6 +36,7 @@ dev = [
     "isort",
     "flake8",
     "pytest",
+    "pytest-cov",
 ]
 
 [tool.black]
