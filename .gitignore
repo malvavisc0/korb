@@ -6,6 +6,9 @@ __pycache__/
 dist/
 build/
 
+# Lock file
+uv.lock
+
 # Downloaded HTML data (keep folders via .gitkeep)
 files/**/*.html
 
