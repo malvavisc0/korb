@@ -4,15 +4,14 @@ on:
   release:
     types: [published]
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   publish:
     runs-on: ubuntu-latest
     environment: pypi
-    
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
       - uses: actions/checkout@v6
         with:
@@ -30,4 +29,4 @@ jobs:
         run: uv build
 
       - name: Publish to PyPI
-        run: uv publish
+        run: uv publish --trusted-publishing always
