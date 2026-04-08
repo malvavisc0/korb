@@ -295,6 +295,7 @@ Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output dir
 │   └── team.py          # Team results viewer & metrics
 ├── skills/              # AI skill definitions for automated analysis
 ├── files/               # Downloaded HTML data (git-ignored)
+├── tests/               # Tests
 ├── pyproject.toml       # Project metadata & uv config
 └── README.md
 ```
