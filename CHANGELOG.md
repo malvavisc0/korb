@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.2] — 2026-04-09
+
+### Added
+
+- `LeagueInfo` dataclass in `core.py` — bundles league name and Liganr. extracted from HTML.
+- All `--json` outputs now include `liga_name`, `liga_number`, and `ligaid` metadata at the top level.
+- New `extract_league_info()` function parses both league name and `Liganr.: <number>` from DBB HTML.
+
+### Changed
+
+- `standings`, `team`, `schedule`, `predict`, and `top` JSON responses are now wrapped objects instead of flat lists, with league metadata and a named data key (`standings`, `results`, `schedule`, `predictions`, `top`).
+- `read_games()`, `calculate_standings()`, `parse_schedule()`, `get_team_results()`, and `predict_standings()` return `LeagueInfo` instead of a bare `str` league name.
+
+---
+
 ## [0.2.1] — 2026-04-08
 
 ### Changed
