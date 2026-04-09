@@ -9,7 +9,7 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 from collections import defaultdict
 from math import exp, sqrt
 
-from korb.core import Game, read_games
+from korb.core import Game, LeagueInfo, read_games
 from korb.schedule import ScheduledGame, filter_schedule, parse_schedule
 from korb.standings import Standing, TeamStats
 
@@ -252,7 +252,7 @@ def predict_game(
 def predict_standings(
     results_path: str,
     html_path: str,
-) -> tuple[list[Standing], list[tuple[ScheduledGame, str, int, int]]]:
+) -> tuple[list[Standing], list[tuple[ScheduledGame, str, int, int]], LeagueInfo]:
     """Predict final standings based on remaining games.
 
     Completed games (from results file) are cross-referenced against
@@ -263,9 +263,10 @@ def predict_standings(
         html_path: HTML schedule file path.
 
     Returns:
-        Tuple of (standings, predictions) where standings is the
-        predicted final standings and predictions is a list of
-        (game, winner, home_score, away_score) tuples.
+        Tuple of (standings, predictions, league_info) where standings
+        is the predicted final standings, predictions is a list of
+        (game, winner, home_score, away_score) tuples, and league_info
+        contains league metadata.
     """
     rp = results_path
     teams_base, ratings, league_avg = calc_strength(rp)
@@ -282,7 +283,7 @@ def predict_standings(
         t.pa = st.pa
 
     # Build set of already-played matchups to avoid double-counting
-    played, _ = read_games(rp)
+    played, league_info = read_games(rp)
     played_keys: set[tuple[str, str, str]] = {
         (g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played
     }
@@ -358,7 +359,7 @@ def predict_standings(
     standings.sort(
         key=lambda s: (-s.stats.pts, -s.stats.diff, -s.stats.pf),
     )
-    return standings, preds
+    return standings, preds, league_info
 
 
 def print_predictions(

@@ -10,7 +10,8 @@ from html.parser import HTMLParser
 from typing import Optional
 
 from korb.core import (
-    extract_league_name,
+    LeagueInfo,
+    extract_league_info,
     parse_date,
     print_header,
     read_file_safe,
@@ -124,21 +125,21 @@ class _HTMLScheduleParser(HTMLParser):
             pass
 
 
-def parse_schedule(html_file: str) -> tuple[list[ScheduledGame], str]:
+def parse_schedule(html_file: str) -> tuple[list[ScheduledGame], LeagueInfo]:
     """Parse HTML file into scheduled games, sorted newest first.
 
     Args:
         html_file: Path to HTML schedule file.
 
     Returns:
-        Tuple of (games sorted by date descending, league_name).
+        Tuple of (games sorted by date descending, league_info).
     """
     content = read_file_safe(html_file)
-    league_name = extract_league_name(content)
+    league_info = extract_league_info(content)
     parser = _HTMLScheduleParser()
     parser.feed(content)
     parser.games.sort(key=lambda g: g.date, reverse=True)
-    return parser.games, league_name
+    return parser.games, league_info
 
 
 def filter_schedule(

@@ -17,6 +17,7 @@ import zlib
 from pathlib import Path
 
 from . import __version__
+from .core import LeagueInfo
 from .predict import predict_standings, print_predicted_standings, print_predictions
 from .schedule import (
     filter_schedule,
@@ -33,6 +34,25 @@ def _json_out(data: object) -> None:
     print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
+def _liga_meta(
+    league_info: LeagueInfo,
+    ligaid: int | None,
+) -> dict:
+    """Build liga metadata dict for JSON output.
+
+    Args:
+        league_info: League metadata from HTML.
+        ligaid: Liga ID from CLI argument (may be None).
+
+    Returns:
+        Dict with liga_name, liga_number, and ligaid.
+    """
+    return {
+        **league_info.to_dict(),
+        "ligaid": ligaid,
+    }
+
+
 def cmd_standings(args: argparse.Namespace) -> None:
     """Handle 'standings' subcommand."""
     fp = args.results
@@ -45,11 +65,16 @@ def cmd_standings(args: argparse.Namespace) -> None:
             sys.exit(1)
         fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
-    standings, league_name = calculate_standings(fp)
+    standings, league_info = calculate_standings(fp)
     if args.json:
-        _json_out([s.to_dict() for s in standings])
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "standings": [s.to_dict() for s in standings],
+            }
+        )
     else:
-        print_table(standings, league_name)
+        print_table(standings, league_info.name)
 
 
 def cmd_team(args: argparse.Namespace) -> None:
@@ -64,18 +89,24 @@ def cmd_team(args: argparse.Namespace) -> None:
             sys.exit(1)
         fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
-    results, league_name = get_team_results(args.name, fp)
+    results, league_info = get_team_results(args.name, fp)
     if args.json:
         data = [r.to_dict() for r in results]
-        _json_out({"team": args.name, "results": data})
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "team": args.name,
+                "results": data,
+            }
+        )
         return
-    print_results(args.name, results, league_name)
+    print_results(args.name, results, league_info.name)
     if args.bars:
         print()
         print_bars(results)
     if args.metrics or args.last_k:
         print()
-        print_metrics(results, league_name, last_k=args.last_k)
+        print_metrics(results, league_info.name, last_k=args.last_k)
 
 
 def cmd_schedule(args: argparse.Namespace) -> None:
@@ -90,14 +121,19 @@ def cmd_schedule(args: argparse.Namespace) -> None:
             sys.exit(1)
         html = str(Path("files") / str(args.ligaid) / "spielplan.html")
 
-    games, league_name = parse_schedule(html)
+    games, league_info = parse_schedule(html)
     filtered = filter_schedule(
         games, show_all=args.all, pending=args.pending, team=args.team
     )
     if args.json:
-        _json_out([g.to_dict() for g in filtered])
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "schedule": [g.to_dict() for g in filtered],
+            }
+        )
     else:
-        print_schedule(filtered, league_name, b2b=args.b2b)
+        print_schedule(filtered, league_info.name, b2b=args.b2b)
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
@@ -126,10 +162,11 @@ def cmd_predict(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    standings, preds = predict_standings(rp, sp)
+    standings, preds, league_info = predict_standings(rp, sp)
     if args.json:
         _json_out(
             {
+                **_liga_meta(league_info, args.ligaid),
                 "predictions": [
                     {
                         "home": g.home,
@@ -167,11 +204,16 @@ def cmd_top(args: argparse.Namespace) -> None:
             sys.exit(1)
         fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
 
-    standings, _league_name = calculate_standings(fp)
+    standings, league_info = calculate_standings(fp)
     top = standings[: args.n]
 
     if args.json:
-        _json_out([s.to_dict() for s in top])
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "top": [s.to_dict() for s in top],
+            }
+        )
         return
 
     tw = max(4, max(len(s.name) for s in top))

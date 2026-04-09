@@ -58,8 +58,9 @@ class TestHTMLScheduleParser:
 
 class TestParseSchedule:
     def test_valid_html(self, spielplan_path):
-        games, league = parse_schedule(spielplan_path)
-        assert league == "Test Bezirksliga"
+        games, league_info = parse_schedule(spielplan_path)
+        assert league_info.name == "Test Bezirksliga"
+        assert league_info.number == 99999
         assert len(games) == 4  # 4 rows total (including cancelled)
 
     def test_sorting_by_date(self, spielplan_path):

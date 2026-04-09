@@ -8,7 +8,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Final
 
-from korb.core import Game, print_header, read_games
+from korb.core import Game, LeagueInfo, print_header, read_games
 
 WIN_PTS: Final[int] = 2
 LOSS_PTS: Final[int] = 0
@@ -74,24 +74,24 @@ class Standing:
         return {"name": self.name, **self.stats.to_dict()}
 
 
-def calculate_standings(filepath: str) -> tuple[list[Standing], str]:
+def calculate_standings(filepath: str) -> tuple[list[Standing], LeagueInfo]:
     """Calculate league standings from game results.
 
     Args:
         filepath: HTML results file path.
 
     Returns:
-        Tuple of (standings sorted by pts/diff/pf, league_name).
+        Tuple of (standings sorted by pts/diff/pf, league_info).
     """
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
-    games, league_name = read_games(filepath)
+    games, league_info = read_games(filepath)
 
     for game in games:
         _update_stats(teams, game)
 
     standings = [Standing(name, stats) for name, stats in teams.items()]
     standings.sort(key=lambda s: (-s.stats.pts, -s.stats.diff, -s.stats.pf))
-    return standings, league_name
+    return standings, league_info
 
 
 def _update_stats(teams: dict[str, TeamStats], game: Game) -> None:

@@ -166,8 +166,12 @@ class TestPredictStandings:
     def test_full_integration(self, ergebnisse_path, spielplan_path):
         from korb.predict import predict_standings
 
-        standings, preds = predict_standings(ergebnisse_path, spielplan_path)
+        standings, preds, league_info = predict_standings(
+            ergebnisse_path, spielplan_path
+        )
         assert len(standings) > 0
+        assert league_info.name == "Test Bezirksliga"
+        assert league_info.number == 99999
         # Verify sorting
         for i in range(len(standings) - 1):
             s1, s2 = standings[i], standings[i + 1]
@@ -180,7 +184,9 @@ class TestPredictStandings:
     def test_no_pending_games(self, ergebnisse_path, spielplan_finalized_path):
         from korb.predict import predict_standings
 
-        standings, preds = predict_standings(ergebnisse_path, spielplan_finalized_path)
+        standings, preds, _ = predict_standings(
+            ergebnisse_path, spielplan_finalized_path
+        )
         assert len(preds) == 0
         # Standings should still reflect completed games
         assert len(standings) > 0

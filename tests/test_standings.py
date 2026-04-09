@@ -112,6 +112,14 @@ class TestCalculateStandings:
             "<title>Ergebnisse - League (x)</title>"
             "</head><body></body></html>"
         )
-        standings, league = calculate_standings(str(f))
-        assert league == "League"
+        standings, league_info = calculate_standings(str(f))
+        assert league_info.name == "League"
+        assert league_info.number is None
         assert standings == []
+
+    def test_returns_league_info(self, ergebnisse_path):
+        from korb.standings import calculate_standings
+
+        standings, league_info = calculate_standings(ergebnisse_path)
+        assert league_info.name == "Test Bezirksliga"
+        assert league_info.number == 99999

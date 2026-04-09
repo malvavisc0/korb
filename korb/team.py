@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from statistics import pstdev
 from typing import Optional
 
-from korb.core import Game, print_header, read_games
+from korb.core import Game, LeagueInfo, print_header, read_games
 
 
 @dataclass
@@ -83,7 +83,9 @@ def _game_to_result(game: Game, is_home: bool) -> GameResult:
     )
 
 
-def get_team_results(team_name: str, filepath: str) -> tuple[list[GameResult], str]:
+def get_team_results(
+    team_name: str, filepath: str
+) -> tuple[list[GameResult], LeagueInfo]:
     """Get all game results for a team (case-insensitive partial match).
 
     Args:
@@ -91,9 +93,9 @@ def get_team_results(team_name: str, filepath: str) -> tuple[list[GameResult], s
         filepath: HTML results file path.
 
     Returns:
-        Tuple of (game results, league_name).
+        Tuple of (game results, league_info).
     """
-    games, league_name = read_games(filepath)
+    games, league_info = read_games(filepath)
     results: list[GameResult] = []
     name_lower = team_name.lower()
 
@@ -103,7 +105,7 @@ def get_team_results(team_name: str, filepath: str) -> tuple[list[GameResult], s
         elif name_lower in game.away.lower():
             results.append(_game_to_result(game, is_home=False))
 
-    return results, league_name
+    return results, league_info
 
 
 def _sparkline_char(result: str) -> str:

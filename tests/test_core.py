@@ -3,8 +3,9 @@
 from datetime import datetime
 
 from korb.core import (
+    LeagueInfo,
     _HTMLResultsParser,
-    extract_league_name,
+    extract_league_info,
     parse_date,
     parse_score,
     read_games,
@@ -53,14 +54,16 @@ class TestParseScore:
         assert parse_score("ab : cd") == (None, None)
 
 
-class TestExtractLeagueName:
+class TestExtractLeagueInfo:
     def test_valid_ergebnisse_title(self):
         html = (
             "<html><head>"
             "<title>Ergebnisse - Test Bezirksliga (U12 ...)</title>"
             "</head></html>"
         )
-        assert extract_league_name(html) == "Test Bezirksliga"
+        info = extract_league_info(html)
+        assert info.name == "Test Bezirksliga"
+        assert info.number is None
 
     def test_valid_spielplan_title(self):
         html = (
@@ -68,14 +71,43 @@ class TestExtractLeagueName:
             "<title>Spielplan - My League (Senior ...)</title>"
             "</head></html>"
         )
-        assert extract_league_name(html) == "My League"
+        info = extract_league_info(html)
+        assert info.name == "My League"
+        assert info.number is None
+
+    def test_with_liganr(self):
+        html = (
+            "<td>Ergebnisse - MFR U12 mix Bezirksliga Nord "
+            "(U12 Mittelfranken; Liganr.: 23182)</td>"
+        )
+        info = extract_league_info(html)
+        assert info.name == "MFR U12 mix Bezirksliga Nord"
+        assert info.number == 23182
 
     def test_missing_title(self):
         html = "<html><head><title>Some random title</title></head></html>"
-        assert extract_league_name(html) == "Basketball League"
+        info = extract_league_info(html)
+        assert info.name == "Basketball League"
+        assert info.number is None
 
     def test_empty_html(self):
-        assert extract_league_name("") == "Basketball League"
+        info = extract_league_info("")
+        assert info.name == "Basketball League"
+        assert info.number is None
+
+    def test_to_dict(self):
+        info = LeagueInfo(name="Test League", number=12345)
+        assert info.to_dict() == {
+            "liga_name": "Test League",
+            "liga_number": 12345,
+        }
+
+    def test_to_dict_no_number(self):
+        info = LeagueInfo(name="Test League")
+        assert info.to_dict() == {
+            "liga_name": "Test League",
+            "liga_number": None,
+        }
 
 
 class TestHTMLResultsParser:
@@ -118,8 +150,9 @@ class TestHTMLResultsParser:
 
 class TestReadGames:
     def test_valid_games(self, ergebnisse_path):
-        games, league = read_games(ergebnisse_path)
-        assert league == "Test Bezirksliga"
+        games, league_info = read_games(ergebnisse_path)
+        assert league_info.name == "Test Bezirksliga"
+        assert league_info.number == 99999
         assert len(games) == 4  # 5 rows, 1 cancelled
 
     def test_sorting_newest_first(self, ergebnisse_path):

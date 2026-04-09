@@ -19,6 +19,21 @@ _LEAGUE_FALLBACK: Final[str] = "Basketball League"
 # "Spielplan - MFR U12 mix Bezirksliga Nord (U12 ...)"
 _TITLE_RE = re.compile(r"(?:Ergebnisse|Spielplan)\s*-\s*(.+?)\s*\(")
 
+# Regex for Liganr. inside parenthetical, e.g. "Liganr.: 23182"
+_LIGANR_RE = re.compile(r"Liganr\.:\s*(\d+)")
+
+
+@dataclass
+class LeagueInfo:
+    """Metadata about a league extracted from DBB HTML."""
+
+    name: str
+    number: Optional[int] = None
+
+    def to_dict(self) -> dict:
+        """Serializable dict."""
+        return {"liga_name": self.name, "liga_number": self.number}
+
 
 @dataclass
 class Game:
@@ -148,20 +163,30 @@ class _HTMLResultsParser(HTMLParser):
         )
 
 
-def extract_league_name(html: str) -> str:
-    """Extract league name from DBB HTML title tag.
+def extract_league_info(html: str) -> LeagueInfo:
+    """Extract league metadata from DBB HTML content.
+
+    Parses the league name from the title pattern and the Liganr.
+    from the parenthetical section.
 
     Args:
         html: Raw HTML content.
 
     Returns:
-        League name string, or fallback if not found.
+        LeagueInfo with name and optional number.
     """
     m = _TITLE_RE.search(html)
-    return m.group(1).strip() if m else _LEAGUE_FALLBACK
+    name = m.group(1).strip() if m else _LEAGUE_FALLBACK
+    nr_match = _LIGANR_RE.search(html)
+    number = int(nr_match.group(1)) if nr_match else None
+    return LeagueInfo(name=name, number=number)
 
 
-def read_games(filepath: str) -> tuple[list[Game], str]:
+# Backward-compatible alias
+extract_league_name = extract_league_info
+
+
+def read_games(filepath: str) -> tuple[list[Game], LeagueInfo]:
     """Read all valid games from HTML results file.
 
     Skips forfeited games (struck-through rows) and incomplete rows.
@@ -170,14 +195,14 @@ def read_games(filepath: str) -> tuple[list[Game], str]:
         filepath: Path to HTML results file.
 
     Returns:
-        Tuple of (games sorted newest-first, league_name).
+        Tuple of (games sorted newest-first, league_info).
     """
     content = read_file_safe(filepath)
-    league_name = extract_league_name(content)
+    league_info = extract_league_info(content)
     parser = _HTMLResultsParser()
     parser.feed(content)
     parser.games.sort(key=lambda g: g.date, reverse=True)
-    return parser.games, league_name
+    return parser.games, league_info
 
 
 def print_header(

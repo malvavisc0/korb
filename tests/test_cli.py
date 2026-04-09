@@ -30,7 +30,14 @@ class TestCmdStandings:
         import json
 
         data = json.loads(captured.out)
-        assert isinstance(data, list)
+        assert isinstance(data, dict)
+        assert "liga_name" in data
+        assert "liga_number" in data
+        assert "ligaid" in data
+        assert data["liga_name"] == "Test Bezirksliga"
+        assert data["liga_number"] == 99999
+        assert data["ligaid"] is None
+        assert isinstance(data["standings"], list)
 
 
 class TestCmdTeam:
@@ -77,6 +84,9 @@ class TestCmdTeam:
         import json
 
         data = json.loads(captured.out)
+        assert "liga_name" in data
+        assert "liga_number" in data
+        assert "ligaid" in data
         assert "team" in data
         assert "results" in data
 
@@ -125,7 +135,11 @@ class TestCmdSchedule:
         import json
 
         data = json.loads(captured.out)
-        assert isinstance(data, list)
+        assert isinstance(data, dict)
+        assert "liga_name" in data
+        assert "liga_number" in data
+        assert "ligaid" in data
+        assert isinstance(data["schedule"], list)
 
 
 class TestCmdPredict:
