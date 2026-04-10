@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.3] — 2026-04-10
+
+### Added
+
+- `skill` subcommand — prints built-in AI skill prompts to stdout.
+- `skill --list` / `-l` flag — lists available skill names and filenames.
+- `korb/skills/` package with `SKILL_MAP` and `get_skill_text()` using `importlib.resources`.
+- Two bundled skills: `analysis` (team deep-dive) and `prediction` (league top-N forecast).
+- Skill markdown files now shipped inside the `korb` package (included in pip distributions).
+
+### Changed
+
+- Migrated `skills/` from project root into `korb/skills/` for proper wheel inclusion.
+
+---
+
 ## [0.2.2] — 2026-04-09
 
 ### Added

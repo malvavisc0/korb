@@ -98,4 +98,3 @@ Keep it brief (caption-like) and avoid bullet points.
 ## Output
 
 Return: (1) the markdown table and (2) the explanation paragraph.
-

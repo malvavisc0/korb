@@ -4,7 +4,13 @@ import argparse
 
 import pytest
 
-from korb.__main__ import cmd_predict, cmd_schedule, cmd_standings, cmd_team
+from korb.__main__ import (
+    cmd_predict,
+    cmd_schedule,
+    cmd_skill,
+    cmd_standings,
+    cmd_team,
+)
 
 
 def _make_args(**kwargs) -> argparse.Namespace:
@@ -167,3 +173,34 @@ class TestCmdPredict:
         cmd_predict(args)
         captured = capsys.readouterr()
         assert "Predicted" in captured.out
+
+
+class TestCmdSkill:
+    def test_analysis_skill(self, capsys):
+        args = _make_args(name="analysis", list_skills=False)
+        cmd_skill(args)
+        out = capsys.readouterr().out
+        assert "Team Analysis" in out
+
+    def test_prediction_skill(self, capsys):
+        args = _make_args(name="prediction", list_skills=False)
+        cmd_skill(args)
+        out = capsys.readouterr().out
+        assert "League Prediction" in out
+
+    def test_list_skills(self, capsys):
+        args = _make_args(name=None, list_skills=True)
+        cmd_skill(args)
+        out = capsys.readouterr().out
+        assert "analysis" in out
+        assert "prediction" in out
+
+    def test_no_args(self):
+        args = _make_args(name=None, list_skills=False)
+        with pytest.raises(SystemExit):
+            cmd_skill(args)
+
+    def test_invalid_skill(self):
+        args = _make_args(name="nonexistent", list_skills=False)
+        with pytest.raises(SystemExit):
+            cmd_skill(args)

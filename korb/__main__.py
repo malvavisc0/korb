@@ -26,6 +26,7 @@ from .schedule import (
     print_schedule,
 )
 from .standings import calculate_standings, print_table
+from .skills import SKILL_MAP, get_skill_text
 from .team import get_team_results, print_bars, print_metrics, print_results
 
 
@@ -352,6 +353,22 @@ def cmd_download(args: argparse.Namespace) -> None:
     _download(args.ligaid)
 
 
+def cmd_skill(args: argparse.Namespace) -> None:
+    """Handle 'skill' subcommand."""
+    if args.list_skills:
+        for name, filename in SKILL_MAP.items():
+            print(f"  {name:12s}  {filename}")
+        return
+    if args.name is None:
+        print("Error: pass a skill name or --list", file=sys.stderr)
+        sys.exit(1)
+    try:
+        print(get_skill_text(args.name))
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
 def main() -> None:
     """Entry point for CLI."""
     parser = argparse.ArgumentParser(
@@ -477,6 +494,25 @@ def main() -> None:
         help="Download results & schedule HTML",
     )
     p_dl.set_defaults(func=cmd_download)
+
+    p_sk = subs.add_parser(
+        "skill",
+        help="Print a skill prompt or list available skills",
+    )
+    p_sk.add_argument(
+        "name",
+        nargs="?",
+        default=None,
+        help="Skill name: analysis or prediction",
+    )
+    p_sk.add_argument(
+        "--list",
+        "-l",
+        action="store_true",
+        dest="list_skills",
+        help="List available skill names and descriptions",
+    )
+    p_sk.set_defaults(func=cmd_skill)
 
     args = parser.parse_args()
 

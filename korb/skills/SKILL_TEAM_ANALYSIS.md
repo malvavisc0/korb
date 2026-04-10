@@ -66,11 +66,11 @@ uv run korb --json --ligaid <LIGA_ID> team "<TEAM_NAME>"
 
 Important: in JSON mode, the CLI returns **all matching games** and does **not** apply `--last-k` slicing or `--metrics` printing logic.
 
-So to emulate “last 5 games”:
+So to emulate "last 5 games":
 
 1. Take `team_json["results"]`.
 2. Treat it as **newest-first**.
-3. Use the first 5 items as the “last 5”. If there are fewer than 5 games, use all available.
+3. Use the first 5 items as the "last 5". If there are fewer than 5 games, use all available.
 
 Compute:
 
@@ -92,7 +92,7 @@ uv run korb --json --ligaid <LIGA_ID> schedule --pending
 uv run korb --json --ligaid <LIGA_ID> predict
 ```
 
-From `predict_json["standings"]` extract the team’s **predicted rank** as `index_in_list + 1`.
+From `predict_json["standings"]` extract the team's **predicted rank** as `index_in_list + 1`.
 
 ---
 
@@ -118,4 +118,3 @@ Write the paragraph in the selected `LANGUAGE`.
 ## Output
 
 Return the paragraph directly. Do **not** save to a file.
-

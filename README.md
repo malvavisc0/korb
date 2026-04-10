@@ -22,6 +22,7 @@ A zero-dependency Python CLI that parses HTML from the **DBB** (Deutscher Basket
 - 🔮 **Predictions** — efficiency-model-based final standings forecast
 - 🥇 **Top N** — quick leaderboard with ASCII bar chart
 - 📥 **Download** — fetch fresh HTML data directly from basketball-bund.net
+- 🤖 **Skills** — built-in AI skill prompts for team analysis & league prediction
 - 🔧 **JSON output** — pipe-friendly `--json` flag for all commands
 
 ---
@@ -136,6 +137,19 @@ Uses a multiplicative efficiency model with recency weighting, recent form blend
 uv run korb --ligaid 12345 top -n 5
 ```
 
+### `skill` — Print AI skill prompts
+
+```bash
+# List available skills
+uv run korb skill --list
+
+# Print a specific skill prompt
+uv run korb skill analysis
+uv run korb skill prediction
+```
+
+Ships two built-in skills: `analysis` (team deep-dive) and `prediction` (league top-N forecast).
+
 ### `--download` — Fetch fresh data before any command
 
 ```bash
@@ -167,18 +181,19 @@ $ uv run korb --help
 
 usage: korb [-h] [--version] [--results RESULTS] [--schedule SCHEDULE]
             [--json] [--ligaid LIGAID] [--download]
-            {standings,team,schedule,predict,top,download} ...
+            {standings,team,schedule,predict,top,download,skill} ...
 
 Basketball league analysis tools
 
 positional arguments:
-  {standings,team,schedule,predict,top,download}
+  {standings,team,schedule,predict,top,download,skill}
     standings           Display league standings
     team                Display results for a team
     schedule            Display game schedule
     predict             Predict final standings
     top                 Show top teams from standings
     download            Download results & schedule HTML
+    skill               Print a skill prompt or list available skills
 
 options:
   -h, --help            show this help message and exit
