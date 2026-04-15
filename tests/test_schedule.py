@@ -66,7 +66,7 @@ class TestParseSchedule:
     def test_sorting_by_date(self, spielplan_path):
         games, _ = parse_schedule(spielplan_path)
         for i in range(len(games) - 1):
-            assert games[i].date >= games[i + 1].date
+            assert games[i].date <= games[i + 1].date
 
     def test_missing_file_raises(self, tmp_path):
         with pytest.raises(SystemExit):

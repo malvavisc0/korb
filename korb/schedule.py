@@ -126,19 +126,19 @@ class _HTMLScheduleParser(HTMLParser):
 
 
 def parse_schedule(html_file: str) -> tuple[list[ScheduledGame], LeagueInfo]:
-    """Parse HTML file into scheduled games, sorted newest first.
+    """Parse HTML file into scheduled games, sorted chronologically.
 
     Args:
         html_file: Path to HTML schedule file.
 
     Returns:
-        Tuple of (games sorted by date descending, league_info).
+        Tuple of (games sorted by date ascending, league_info).
     """
     content = read_file_safe(html_file)
     league_info = extract_league_info(content)
     parser = _HTMLScheduleParser()
     parser.feed(content)
-    parser.games.sort(key=lambda g: g.date, reverse=True)
+    parser.games.sort(key=lambda g: g.date)
     return parser.games, league_info
 
 
