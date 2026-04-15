@@ -182,10 +182,6 @@ def extract_league_info(html: str) -> LeagueInfo:
     return LeagueInfo(name=name, number=number)
 
 
-# Backward-compatible alias
-extract_league_name = extract_league_info
-
-
 def read_games(filepath: str) -> tuple[list[Game], LeagueInfo]:
     """Read all valid games from HTML results file.
 
