@@ -4,7 +4,6 @@ import gzip
 import zlib
 from unittest.mock import MagicMock, patch
 
-
 from korb.__main__ import _DELAY_MAX, _DELAY_MIN, _HEADERS, _read_response
 
 
@@ -44,7 +43,6 @@ class TestHeaders:
 
     def test_dnt_set(self):
         assert _HEADERS["DNT"] == "1"
-
 
 
 def _fake_response(body: bytes, encoding: str = "") -> MagicMock:
@@ -90,7 +88,6 @@ class TestReadResponse:
         assert _read_response(resp) == raw
 
 
-
 class TestDownload:
     """Verify _download sends correct headers and sleeps between requests."""
 
@@ -120,9 +117,7 @@ class TestDownload:
             # Use real tmp_path for file writes
             dest_a = tmp_path / "ergebnisse.html"
             dest_b = tmp_path / "spielplan.html"
-            mock_liga.__truediv__ = MagicMock(
-                side_effect=[dest_a, dest_b]
-            )
+            mock_liga.__truediv__ = MagicMock(side_effect=[dest_a, dest_b])
             mock_root.__truediv__ = MagicMock(return_value=mock_liga)
             mock_liga.mkdir = MagicMock()
 
@@ -158,9 +153,7 @@ class TestDownload:
 
             dest_a = tmp_path / "ergebnisse.html"
             dest_b = tmp_path / "spielplan.html"
-            mock_liga.__truediv__ = MagicMock(
-                side_effect=[dest_a, dest_b]
-            )
+            mock_liga.__truediv__ = MagicMock(side_effect=[dest_a, dest_b])
             mock_root.__truediv__ = MagicMock(return_value=mock_liga)
             mock_liga.mkdir = MagicMock()
 

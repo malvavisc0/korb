@@ -25,8 +25,8 @@ from .schedule import (
     parse_schedule,
     print_schedule,
 )
-from .standings import calculate_standings, print_table
 from .skills import SKILL_MAP, get_skill_text
+from .standings import calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
 
 
