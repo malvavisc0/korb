@@ -6,16 +6,18 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from statistics import pstdev
 from typing import Optional
 
-from korb.core import Game, LeagueInfo, print_header, read_games
+from korb.core import DATE_FMT, Game, LeagueInfo, print_header, read_games
 
 
 @dataclass
 class GameResult:
     """Result of a single game from a team's perspective."""
 
+    date: datetime
     opponent: str
     home_away: str
     our_score: int
@@ -30,6 +32,7 @@ class GameResult:
     def to_dict(self) -> dict:
         """Serializable dict including computed properties."""
         return {
+            "date": self.date.strftime(DATE_FMT),
             "opponent": self.opponent,
             "home_away": self.home_away,
             "our_score": self.our_score,
@@ -68,6 +71,7 @@ def _game_to_result(game: Game, is_home: bool) -> GameResult:
     """
     if is_home:
         return GameResult(
+            date=game.date,
             opponent=game.away,
             home_away="Home",
             our_score=game.home_score,
@@ -75,6 +79,7 @@ def _game_to_result(game: Game, is_home: bool) -> GameResult:
             result=_result_code(game.home_score, game.away_score),
         )
     return GameResult(
+        date=game.date,
         opponent=game.home,
         home_away="Away",
         our_score=game.away_score,

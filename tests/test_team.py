@@ -13,16 +13,18 @@ from korb.team import (
 
 
 class TestGameResultDiff:
+    _DATE = datetime(2026, 1, 15, 10, 0)
+
     def test_positive(self):
-        r = GameResult("Team B", "Home", 85, 70, "W")
+        r = GameResult(self._DATE, "Team B", "Home", 85, 70, "W")
         assert r.diff == 15
 
     def test_negative(self):
-        r = GameResult("Team B", "Away", 60, 80, "L")
+        r = GameResult(self._DATE, "Team B", "Away", 60, 80, "L")
         assert r.diff == -20
 
     def test_zero(self):
-        r = GameResult("Team B", "Home", 70, 70, "D")
+        r = GameResult(self._DATE, "Team B", "Home", 70, 70, "D")
         assert r.diff == 0
 
 
@@ -49,6 +51,7 @@ class TestGameToResult:
 
     def test_home_perspective_win(self):
         r = _game_to_result(self._game(80, 70), is_home=True)
+        assert r.date == datetime(2026, 1, 15, 10, 0)
         assert r.opponent == "Team B"
         assert r.home_away == "Home"
         assert r.our_score == 80
@@ -57,6 +60,7 @@ class TestGameToResult:
 
     def test_away_perspective_loss(self):
         r = _game_to_result(self._game(80, 70), is_home=False)
+        assert r.date == datetime(2026, 1, 15, 10, 0)
         assert r.opponent == "Team A"
         assert r.home_away == "Away"
         assert r.our_score == 70
@@ -96,3 +100,17 @@ class TestSparklineChar:
 
     def test_unknown(self):
         assert _sparkline_char("X") == " "
+
+
+class TestGameResultToDict:
+    def test_to_dict_includes_date(self):
+        date = datetime(2026, 3, 15, 18, 0)
+        r = GameResult(date, "Team B", "Home", 79, 75, "W")
+        d = r.to_dict()
+        assert d["date"] == "15.03.2026 18:00"
+        assert d["opponent"] == "Team B"
+        assert d["home_away"] == "Home"
+        assert d["our_score"] == 79
+        assert d["opp_score"] == 75
+        assert d["result"] == "W"
+        assert d["diff"] == 4
