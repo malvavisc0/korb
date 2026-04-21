@@ -422,7 +422,7 @@ def main() -> None:
     )
     p_tm.add_argument(
         "name",
-        help="Team name (e.g., 'TV 1877 Lauf')",
+        help="Team name (e.g., 'Hawks')",
     )
     p_tm.add_argument(
         "--bars",
