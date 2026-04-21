@@ -224,7 +224,7 @@ options:
 usage: korb team [-h] [--bars] [--last-k LAST_K] [--metrics] name
 
 positional arguments:
-  name             Team name (e.g., 'TV 1877 Lauf')
+  name             Team name (e.g., 'Hawks')
 
 options:
   -h, --help       show this help message and exit
