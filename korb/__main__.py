@@ -17,8 +17,9 @@ import zlib
 from pathlib import Path
 
 from . import __version__
-from .core import LeagueInfo
+from .core import LeagueInfo, read_games
 from .predict import predict_standings, print_predicted_standings, print_predictions
+from .ergebnisse import filter_ergebnisse, print_ergebnisse
 from .schedule import (
     filter_schedule,
     is_season_finalized,
@@ -108,6 +109,43 @@ def cmd_team(args: argparse.Namespace) -> None:
     if args.metrics or args.last_k:
         print()
         print_metrics(results, league_info.name, last_k=args.last_k)
+
+
+def cmd_ergebnisse(args: argparse.Namespace) -> None:
+    """Handle 'ergebnisse' subcommand."""
+    fp = args.results
+    if fp is None:
+        if args.ligaid is None:
+            print(
+                "Error: pass --results PATH or --ligaid LIGAID "
+                "for ergebnisse.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
+
+    games, league_info = read_games(fp)
+    filtered = filter_ergebnisse(games, team=args.team)
+    # Sort chronologically (oldest first) for consistent output
+    filtered.sort(key=lambda g: g.date)
+    if args.json:
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "ergebnisse": [
+                    {
+                        "date": g.date.strftime("%d.%m.%Y %H:%M"),
+                        "home": g.home,
+                        "away": g.away,
+                        "home_score": g.home_score,
+                        "away_score": g.away_score,
+                    }
+                    for g in filtered
+                ],
+            }
+        )
+    else:
+        print_ergebnisse(filtered, league_info.name)
 
 
 def cmd_schedule(args: argparse.Namespace) -> None:
@@ -442,6 +480,17 @@ def main() -> None:
         help="Show win-rate + margin quality metrics",
     )
     p_tm.set_defaults(func=cmd_team)
+
+    p_er = subs.add_parser(
+        "ergebnisse",
+        help="Display game results",
+    )
+    p_er.add_argument(
+        "--team",
+        "-t",
+        help="Filter by team name (partial match)",
+    )
+    p_er.set_defaults(func=cmd_ergebnisse)
 
     p_sc = subs.add_parser(
         "schedule",
