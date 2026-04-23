@@ -61,9 +61,7 @@ class TestPrintErgebnisse:
 
 class TestCmdErgebnisse:
     def test_valid_file(self, ergebnisse_path, capsys):
-        args = _make_args(
-            results=ergebnisse_path, ligaid=None, json=False, team=None
-        )
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=False, team=None)
         cmd_ergebnisse(args)
         out = capsys.readouterr().out
         assert "Ergebnisse" in out
@@ -77,9 +75,7 @@ class TestCmdErgebnisse:
         assert "Team Alpha" in out
 
     def test_json_output(self, ergebnisse_path, capsys):
-        args = _make_args(
-            results=ergebnisse_path, ligaid=None, json=True, team=None
-        )
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=True, team=None)
         cmd_ergebnisse(args)
         out = capsys.readouterr().out
         data = json.loads(out)
@@ -93,7 +89,9 @@ class TestCmdErgebnisse:
     def test_missing_file(self, tmp_path):
         args = _make_args(
             results=str(tmp_path / "no.html"),
-            ligaid=None, json=False, team=None,
+            ligaid=None,
+            json=False,
+            team=None,
         )
         with pytest.raises(SystemExit):
             cmd_ergebnisse(args)

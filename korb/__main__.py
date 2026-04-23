@@ -18,8 +18,8 @@ from pathlib import Path
 
 from . import __version__
 from .core import LeagueInfo, read_games
-from .predict import predict_standings, print_predicted_standings, print_predictions
 from .ergebnisse import filter_ergebnisse, print_ergebnisse
+from .predict import predict_standings, print_predicted_standings, print_predictions
 from .schedule import (
     filter_schedule,
     is_season_finalized,
@@ -117,8 +117,7 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
     if fp is None:
         if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --ligaid LIGAID "
-                "for ergebnisse.",
+                "Error: pass --results PATH or --ligaid LIGAID " "for ergebnisse.",
                 file=sys.stderr,
             )
             sys.exit(1)

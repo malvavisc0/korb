@@ -18,6 +18,7 @@ A zero-dependency Python CLI that parses HTML from the **DBB** (Deutscher Basket
 
 - 📊 **Standings** — full league table with points, differentials, averages
 - 🏀 **Team drill-down** — game-by-game results, sparklines, quality metrics
+- 📋 **Ergebnisse** — all completed game results with score differentials, optional team filter
 - 📅 **Schedule** — with back-to-back detection, filtering, pending games
 - 🔮 **Predictions** — efficiency-model-based final standings forecast
 - 🥇 **Top N** — quick leaderboard with ASCII bar chart
@@ -100,6 +101,31 @@ uv run korb --ligaid 12345 standings
 ...
 ```
 
+### `ergebnisse` — All game results
+
+```bash
+# All completed results
+uv run korb --ligaid 12345 ergebnisse
+
+# Filter by team (partial, case-insensitive)
+uv run korb --ligaid 12345 ergebnisse --team "Hawks"
+
+# JSON output
+uv run korb --json --ligaid 12345 ergebnisse
+```
+
+```
+======================================================================
+  Ergebnisse — MFR U12 mix Bezirksliga Nord
+======================================================================
+
+   Datum            Heim              Gast              Ergebnis    Diff
+-----------------------------------------------------------------------
+1  15.01.26 10:00   Team Alpha        Team Beta           79:75      +4
+2  15.01.26 12:00   Team Gamma        Team Delta          60:60       0
+3  22.01.26 15:00   Team Beta         Team Alpha          82:70     +12
+```
+
 ### `team` — Deep dive on a single team
 
 ```bash
@@ -167,6 +193,8 @@ Add `--json` before any subcommand to get JSON instead of tables:
 ```bash
 uv run korb --json --ligaid 12345 standings
 uv run korb --json --ligaid 12345 team "Hawks"
+uv run korb --json --ligaid 12345 ergebnisse
+uv run korb --json --ligaid 12345 ergebnisse --team "Hawks"
 uv run korb --json --ligaid 12345 schedule --pending
 uv run korb --json --ligaid 12345 predict
 uv run korb --json --ligaid 12345 top -n 3
@@ -181,14 +209,15 @@ $ uv run korb --help
 
 usage: korb [-h] [--version] [--results RESULTS] [--schedule SCHEDULE]
             [--json] [--ligaid LIGAID] [--download]
-            {standings,team,schedule,predict,top,download,skill} ...
+            {standings,team,ergebnisse,schedule,predict,top,download,skill} ...
 
 Basketball league analysis tools
 
 positional arguments:
-  {standings,team,schedule,predict,top,download,skill}
+  {standings,team,ergebnisse,schedule,predict,top,download,skill}
     standings           Display league standings
     team                Display results for a team
+    ergebnisse          Display game results
     schedule            Display game schedule
     predict             Predict final standings
     top                 Show top teams from standings
@@ -246,6 +275,18 @@ options:
   --pending, -p    Show only pending games
   --team, -t TEAM  Filter by team name (partial match)
   --b2b            Mark back-to-back fixtures (≤36h)
+```
+</details>
+
+<details>
+<summary><code>ergebnisse --help</code></summary>
+
+```
+usage: korb ergebnisse [-h] [--team TEAM]
+
+options:
+  -h, --help       show this help message and exit
+  --team, -t TEAM  Filter by team name (partial match)
 ```
 </details>
 
@@ -323,6 +364,7 @@ Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output dir
 │   ├── __init__.py      # Package marker
 │   ├── __main__.py      # CLI entry point & download command
 │   ├── core.py          # Shared models, HTML parsing, utilities
+│   ├── ergebnisse.py    # Game results viewer & filter
 │   ├── predict.py       # Multiplicative efficiency prediction model
 │   ├── schedule.py      # HTML schedule parser & filters
 │   ├── standings.py     # Standings calculator
