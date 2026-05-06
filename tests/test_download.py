@@ -4,7 +4,13 @@ import gzip
 import zlib
 from unittest.mock import MagicMock, patch
 
-from korb.__main__ import _DELAY_MAX, _DELAY_MIN, _HEADERS, _read_response
+from korb.__main__ import (
+    _DELAY_MAX,
+    _DELAY_MIN,
+    _HEADERS,
+    _discover_league_ids,
+    _read_response,
+)
 
 
 class TestHeaders:
@@ -173,3 +179,99 @@ class TestDelayConstants:
 
     def test_min_positive(self):
         assert _DELAY_MIN > 0
+
+
+class TestDiscoverLeagueIds:
+    """Verify _discover_league_ids scans the files/ directory."""
+
+    def test_finds_numeric_dirs_with_html(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        # Create two league directories with HTML files
+        for lid in (111, 222):
+            d = tmp_path / "files" / str(lid)
+            d.mkdir(parents=True)
+            (d / "ergebnisse.html").write_text("<html></html>")
+        assert _discover_league_ids() == [111, 222]
+
+    def test_ignores_non_numeric_dirs(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        d = tmp_path / "files" / "not_a_number"
+        d.mkdir(parents=True)
+        (d / "ergebnisse.html").write_text("<html></html>")
+        assert _discover_league_ids() == []
+
+    def test_ignores_dirs_without_html(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        d = tmp_path / "files" / "555"
+        d.mkdir(parents=True)
+        (d / "readme.txt").write_text("no html here")
+        assert _discover_league_ids() == []
+
+    def test_missing_files_dir(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        assert _discover_league_ids() == []
+
+    def test_sorted_output(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        for lid in (300, 100, 200):
+            d = tmp_path / "files" / str(lid)
+            d.mkdir(parents=True)
+            (d / "spielplan.html").write_text("<html></html>")
+        assert _discover_league_ids() == [100, 200, 300]
+
+    def test_ignores_gitkeep_and_files(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        files_dir = tmp_path / "files"
+        files_dir.mkdir()
+        (files_dir / ".gitkeep").write_text("")
+        d = files_dir / "777"
+        d.mkdir()
+        (d / "ergebnisse.html").write_text("<html></html>")
+        assert _discover_league_ids() == [777]
+
+
+class TestCmdDownloadAll:
+    """Verify download --all behaviour."""
+
+    @patch("korb.__main__._download")
+    @patch("korb.__main__._discover_league_ids", return_value=[100, 200])
+    def test_downloads_all_discovered(
+        self, mock_discover, mock_download, capsys
+    ):
+        from korb.__main__ import cmd_download
+
+        args = MagicMock()
+        args.all = True
+        args.ligaid = None
+        cmd_download(args)
+
+        assert mock_download.call_count == 2
+        mock_download.assert_any_call(100)
+        mock_download.assert_any_call(200)
+        out = capsys.readouterr().out
+        assert "2 league(s)" in out
+        assert "Done." in out
+
+    @patch("korb.__main__._discover_league_ids", return_value=[])
+    def test_no_leagues_found(self, mock_discover):
+        import pytest
+
+        from korb.__main__ import cmd_download
+
+        args = MagicMock()
+        args.all = True
+        args.ligaid = None
+        with pytest.raises(SystemExit):
+            cmd_download(args)
+
+    @patch("korb.__main__._download")
+    def test_ligaid_overrides_all(self, mock_download):
+        """When --ligaid is given, --all is ignored."""
+        from korb.__main__ import cmd_download
+
+        args = MagicMock()
+        args.all = True
+        args.ligaid = 999
+        cmd_download(args)
+
+        mock_download.assert_called_once_with(999)

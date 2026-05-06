@@ -82,9 +82,16 @@ After `uv sync`, the `korb` CLI is available inside the virtual environment. Use
 ```bash
 # Download results + schedule for a league
 uv run korb --ligaid 12345 download
+
+# Refresh all previously downloaded leagues at once
+uv run korb download --all
 ```
 
 Saves `ergebnisse.html` and `spielplan.html` into `files/<ligaid>/`.
+
+The `--all` / `-a` flag scans the `files/` directory for all previously
+downloaded league IDs and re-downloads each one. Useful for bulk-refreshing
+data across multiple leagues.
 
 ### `standings` — League table
 
@@ -317,10 +324,11 @@ options:
 <summary><code>download --help</code></summary>
 
 ```
-usage: korb download [-h]
+usage: korb download [-h] [--all]
 
 options:
   -h, --help  show this help message and exit
+  --all, -a   Refresh all previously downloaded leagues
 ```
 </details>
 

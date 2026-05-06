@@ -379,11 +379,44 @@ def _download(ligaid: int) -> None:
             sys.exit(1)
 
 
+def _discover_league_ids() -> list[int]:
+    """Scan the ``files/`` directory for previously downloaded league IDs.
+
+    Looks for subdirectories whose names are valid integers and that
+    contain at least one ``.html`` file.
+
+    Returns:
+        Sorted list of league IDs (int).
+    """
+    root = Path("files")
+    if not root.is_dir():
+        return []
+    ids: list[int] = []
+    for entry in sorted(root.iterdir()):
+        if entry.is_dir() and entry.name.isdigit():
+            if any(entry.glob("*.html")):
+                ids.append(int(entry.name))
+    return ids
+
+
 def cmd_download(args: argparse.Namespace) -> None:
     """Handle 'download' subcommand."""
+    if getattr(args, "all", False) and args.ligaid is None:
+        ids = _discover_league_ids()
+        if not ids:
+            print("No previously downloaded leagues found.", file=sys.stderr)
+            sys.exit(1)
+        print(f"Refreshing {len(ids)} league(s): {', '.join(str(i) for i in ids)}")
+        for i, lid in enumerate(ids):
+            if i > 0:
+                time.sleep(random.uniform(_DELAY_MIN, _DELAY_MAX))
+            print(f"\n--- Liga {lid} ---")
+            _download(lid)
+        print("\nDone.")
+        return
     if args.ligaid is None:
         print(
-            "Error: --ligaid is required for download.",
+            "Error: --ligaid is required for download (or use --all).",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -540,6 +573,12 @@ def main() -> None:
     p_dl = subs.add_parser(
         "download",
         help="Download results & schedule HTML",
+    )
+    p_dl.add_argument(
+        "--all",
+        "-a",
+        action="store_true",
+        help="Refresh all previously downloaded leagues",
     )
     p_dl.set_defaults(func=cmd_download)
 
