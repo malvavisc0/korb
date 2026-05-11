@@ -235,9 +235,7 @@ class TestCmdDownloadAll:
 
     @patch("korb.__main__._download")
     @patch("korb.__main__._discover_league_ids", return_value=[100, 200])
-    def test_downloads_all_discovered(
-        self, mock_discover, mock_download, capsys
-    ):
+    def test_downloads_all_discovered(self, mock_discover, mock_download, capsys):
         from korb.__main__ import cmd_download
 
         args = MagicMock()

@@ -74,15 +74,14 @@ def calc_strength(
         a.pa += game.home_score
         if game.home_score > game.away_score:
             h.w += 1
-            a.l += 1  # noqa: E741
+            a.l += 1
         elif game.home_score < game.away_score:
             a.w += 1
-            h.l += 1  # noqa: E741
+            h.l += 1
         else:
             h.d += 1
             a.d += 1
 
-    # Weighted offensive / defensive totals for prediction
     w_pf: dict[str, float] = defaultdict(float)
     w_pa: dict[str, float] = defaultdict(float)
     w_gp: dict[str, float] = defaultdict(float)
@@ -97,12 +96,10 @@ def calc_strength(
             w_pa[name] += pa * w
             w_gp[name] += w
 
-    # League average (weighted)
     total_pf = sum(w_pf.values())
     total_gp = sum(w_gp.values())
     league_avg = total_pf / total_gp if total_gp else 50.0
 
-    # Recent-form totals (last FORM_GAMES per team, no recency weight)
     form_pf, form_pa, form_gp = _calc_form_totals(games)
 
     ratings = _build_ratings(
@@ -224,7 +221,6 @@ def predict_game(
     h_off, h_def = ratings.get(home, (1.0, 1.0))
     a_off, a_def = ratings.get(away, (1.0, 1.0))
 
-    # Apply fatigue: tired team scores less (off*f) & allows more (def/f)
     h_off *= home_fatigue
     h_def /= home_fatigue
     a_off *= away_fatigue
@@ -237,7 +233,6 @@ def predict_game(
     ph = round(pred_home)
     pa = round(pred_away)
 
-    # Break ties: basketball has no draws (overtime rules)
     if ph == pa:
         if pred_home >= pred_away:
             ph += 1  # home advantage tiebreak
@@ -272,23 +267,20 @@ def predict_standings(
     teams_base, ratings, league_avg = calc_strength(rp)
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
 
-    # Copy current stats
     for name, st in teams_base.items():
         t = teams[name]
         t.gp = st.gp
         t.w = st.w
-        t.l = st.l  # noqa: E741
+        t.l = st.l
         t.d = st.d
         t.pf = st.pf
         t.pa = st.pa
 
-    # Build set of already-played matchups to avoid double-counting
     played, league_info = read_games(rp)
     played_keys: set[tuple[str, str, str]] = {
         (g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played
     }
 
-    # Pending games (exclude already-played)
     schedule, _ = parse_schedule(html_path)
     pending = [
         g
@@ -296,7 +288,6 @@ def predict_standings(
         if (g.home, g.away, g.date.strftime("%d.%m.%Y")) not in played_keys
     ]
 
-    # Sort chronologically and track last-game time per team for fatigue
     pending.sort(key=lambda g: g.date)
     last_game_ts: dict[str, float] = {}
     for g in played:
@@ -332,7 +323,6 @@ def predict_standings(
             away_fatigue=a_fat,
         )
 
-        # Update last-game timestamp for both teams
         last_game_ts[game.home] = gt
         last_game_ts[game.away] = gt
         preds.append((game, winner, hs, as_))
@@ -347,10 +337,10 @@ def predict_standings(
 
         if winner == "home":
             h.w += 1
-            a.l += 1  # noqa: E741
+            a.l += 1
         elif winner == "away":
             a.w += 1
-            h.l += 1  # noqa: E741
+            h.l += 1
         else:
             h.d += 1
             a.d += 1

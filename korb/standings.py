@@ -21,7 +21,7 @@ class TeamStats:
 
     gp: int = 0
     w: int = 0
-    l: int = 0
+    l: int = 0  # noqa: E741
     d: int = 0
     pf: int = 0
     pa: int = 0

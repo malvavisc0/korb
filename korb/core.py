@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
-from typing import Final, Optional
+from typing import Final
 
 DATE_FMT: Final[str] = "%d.%m.%Y %H:%M"
 _LEAGUE_FALLBACK: Final[str] = "Basketball League"
@@ -28,7 +28,7 @@ class LeagueInfo:
     """Metadata about a league extracted from DBB HTML."""
 
     name: str
-    number: Optional[int] = None
+    number: int | None = None
 
     def to_dict(self) -> dict:
         """Serializable dict."""
@@ -46,7 +46,7 @@ class Game:
     away_score: int
 
 
-def parse_date(date_str: str) -> Optional[datetime]:
+def parse_date(date_str: str) -> datetime | None:
     """Parse date string in format 'DD.MM.YYYY HH:MM'.
 
     Args:
@@ -61,7 +61,7 @@ def parse_date(date_str: str) -> Optional[datetime]:
         return None
 
 
-def parse_score(score_str: str) -> tuple[Optional[int], Optional[int]]:
+def parse_score(score_str: str) -> tuple[int | None, int | None]:
     """Parse score string in format '79 : 75'.
 
     Args:
@@ -113,9 +113,7 @@ class _HTMLResultsParser(HTMLParser):
         self._current_cell = ""
         self._row_cancelled = False
 
-    def handle_starttag(
-        self, tag: str, attrs: list[tuple[str, Optional[str]]]
-    ) -> None:  # noqa: unused
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag == "td":
             if self._td_depth == 0:
                 self._in_td = True

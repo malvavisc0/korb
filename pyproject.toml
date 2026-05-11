@@ -51,9 +51,7 @@ features = ["dev"]
 
 [dependency-groups]
 dev = [
-    "black",
-    "isort",
-    "flake8",
+    "ruff",
     "pytest",
     "pytest-cov",
 ]
@@ -67,9 +65,12 @@ addopts = "-v --cov=korb --cov-report=term-missing"
 source = ["korb"]
 omit = ["tests/*", "*/__main__.py"]
 
-[tool.black]
+[tool.ruff]
 line-length = 88
-target-version = ["py312"]
+target-version = "py312"
 
-[tool.isort]
-profile = "black"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["korb"]

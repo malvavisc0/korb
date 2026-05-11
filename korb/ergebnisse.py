@@ -4,12 +4,10 @@ Displays all completed game results for a league with optional team filter.
 Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 """
 
-from typing import Optional
-
 from korb.core import Game, print_header
 
 
-def filter_ergebnisse(games: list[Game], team: Optional[str] = None) -> list[Game]:
+def filter_ergebnisse(games: list[Game], team: str | None = None) -> list[Game]:
     """Filter game results by team name.
 
     Args:

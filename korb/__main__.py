@@ -26,7 +26,6 @@ from .schedule import (
     parse_schedule,
     print_schedule,
 )
-from .skills import SKILL_MAP, get_skill_text
 from .standings import calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
 
@@ -61,7 +60,7 @@ def cmd_standings(args: argparse.Namespace) -> None:
     if fp is None:
         if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --ligaid LIGAID " "for standings.",
+                "Error: pass --results PATH or --ligaid LIGAID for standings.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -85,7 +84,7 @@ def cmd_team(args: argparse.Namespace) -> None:
     if fp is None:
         if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --ligaid LIGAID " "for team results.",
+                "Error: pass --results PATH or --ligaid LIGAID for team results.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -117,7 +116,7 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
     if fp is None:
         if args.ligaid is None:
             print(
-                "Error: pass --results PATH or --ligaid LIGAID " "for ergebnisse.",
+                "Error: pass --results PATH or --ligaid LIGAID for ergebnisse.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -125,7 +124,6 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
 
     games, league_info = read_games(fp)
     filtered = filter_ergebnisse(games, team=args.team)
-    # Sort chronologically (oldest first) for consistent output
     filtered.sort(key=lambda g: g.date)
     if args.json:
         _json_out(
@@ -268,10 +266,8 @@ def cmd_top(args: argparse.Namespace) -> None:
         diff_str = f"+{diff}" if diff > 0 else str(diff)
         print(f"{i:>2}  {s.name:<{tw}}  {st.gp:>2}  {st.pts:>3}  {diff_str:>5}")
 
-    # Points bar chart (ASCII)
     pts_vals = [s.stats.pts for s in top]
     max_pts = max(pts_vals) if pts_vals else 0
-    # Keep chart readable: 1 block per 1–2 points depending on scale.
     scale = 1 if max_pts <= 20 else max(1, max_pts // 20)
     print("\nStandings Points (scaled)")
     print("─────────────────────────")
@@ -393,9 +389,8 @@ def _discover_league_ids() -> list[int]:
         return []
     ids: list[int] = []
     for entry in sorted(root.iterdir()):
-        if entry.is_dir() and entry.name.isdigit():
-            if any(entry.glob("*.html")):
-                ids.append(int(entry.name))
+        if entry.is_dir() and entry.name.isdigit() and any(entry.glob("*.html")):
+            ids.append(int(entry.name))
     return ids
 
 
@@ -421,22 +416,6 @@ def cmd_download(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
     _download(args.ligaid)
-
-
-def cmd_skill(args: argparse.Namespace) -> None:
-    """Handle 'skill' subcommand."""
-    if args.list_skills:
-        for name, filename in SKILL_MAP.items():
-            print(f"  {name:12s}  {filename}")
-        return
-    if args.name is None:
-        print("Error: pass a skill name or --list", file=sys.stderr)
-        sys.exit(1)
-    try:
-        print(get_skill_text(args.name))
-    except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        sys.exit(1)
 
 
 def main() -> None:
@@ -582,28 +561,8 @@ def main() -> None:
     )
     p_dl.set_defaults(func=cmd_download)
 
-    p_sk = subs.add_parser(
-        "skill",
-        help="Print a skill prompt or list available skills",
-    )
-    p_sk.add_argument(
-        "name",
-        nargs="?",
-        default=None,
-        help="Skill name: analysis or prediction",
-    )
-    p_sk.add_argument(
-        "--list",
-        "-l",
-        action="store_true",
-        dest="list_skills",
-        help="List available skill names and descriptions",
-    )
-    p_sk.set_defaults(func=cmd_skill)
-
     args = parser.parse_args()
 
-    # Pre-command download hook
     if args.download and args.command != "download":
         if args.ligaid is None:
             print(

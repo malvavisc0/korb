@@ -7,7 +7,6 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
-from typing import Optional
 
 from korb.core import (
     LeagueInfo,
@@ -56,7 +55,7 @@ class _HTMLScheduleParser(HTMLParser):
         self._current_cell = ""
         self._row_cancelled = False
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         """Track table cell and cancellation markers in HTML.
 
         Args:
@@ -146,7 +145,7 @@ def filter_schedule(
     games: list[ScheduledGame],
     show_all: bool = False,
     pending: bool = False,
-    team: Optional[str] = None,
+    team: str | None = None,
 ) -> list[ScheduledGame]:
     """Filter schedule games by cancellation status, date, and team.
 

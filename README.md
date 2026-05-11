@@ -4,29 +4,54 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&amp;logoColor=white" alt="Python 3.10+">
-  <img src="https://img.shields.io/badge/uv-package%20manager-blueviolet?logo=uv" alt="uv">
+  <img src="https://img.shields.io/badge/python-3.10%2B-blue?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/deps-zero-brightgreen" alt="Zero dependencies">
-  <img src="https://img.shields.io/badge/platform-DBB%20JSP-orange" alt="DBB JSP">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License">
 </p>
 
 ---
 
-## What is this?
+**korb** is a zero-dependency Python CLI that parses HTML from the
+[DBB](https://www.basketball-bund.net) (Deutscher Basketball Bund) legacy JSP
+platform and provides standings, results, schedules, predictions, and more.
 
-A zero-dependency Python CLI that parses HTML from the **DBB** (Deutscher Basketball Bund) legacy JSP platform and gives you:
+## Features
 
 - 📊 **Standings** — full league table with points, differentials, averages
-- 🏀 **Team drill-down** — game-by-game results, sparklines, quality metrics
-- 📋 **Ergebnisse** — all completed game results with score differentials, optional team filter
+- 🏀 **Team** — game-by-game results, sparklines, quality metrics
+- 📋 **Ergebnisse** — all completed game results with optional team filter
 - 📅 **Schedule** — with back-to-back detection, filtering, pending games
-- 🔮 **Predictions** — efficiency-model-based final standings forecast
-- 🥇 **Top N** — quick leaderboard with ASCII bar chart
+- 🔮 **Predict** — efficiency-model-based final standings forecast
+- 🥇 **Top** — quick leaderboard with ASCII bar chart
 - 📥 **Download** — fetch fresh HTML data directly from basketball-bund.net
-- 🤖 **Skills** — built-in AI skill prompts for team analysis & league prediction
-- 🔧 **JSON output** — pipe-friendly `--json` flag for all commands
+- 🔧 **`--json`** — machine-readable output for all commands
 
----
+## Installation
+
+```bash
+# With uv (recommended)
+git clone https://github.com/malvavisc0/korb && cd korb
+uv sync
+
+# With pip
+pip install .
+```
+
+After installation, the `korb` CLI is available inside the virtual environment.
+Use `uv run korb` to invoke it, or activate the venv first.
+
+## Quick Start
+
+```bash
+# Download league data
+uv run korb --ligaid 51187 download
+
+# View standings
+uv run korb --ligaid 51187 standings
+
+# Download fresh data + predict in one go
+uv run korb --ligaid 51187 --download predict
+```
 
 ## Finding your Liga ID
 
@@ -38,60 +63,16 @@ https://www.basketball-bund.net/index.jsp?Action=103&liga_id=51187
                                                            this is your liga ID
 ```
 
-Copy the number after `liga_id=` and pass it to `--ligaid`.
-
----
-
-## Quick Start
-
-```bash
-# Install with uv
-uv sync
-
-# Download league data
-uv run korb --ligaid 51187 download
-
-# View standings
-uv run korb --ligaid 51187 standings
-
-# Download fresh data + predict in one go
-uv run korb --ligaid 51187 --download predict
-```
-
----
-
-## Installation
-
-```bash
-# Clone and install
-git clone https://github.com/malvavisc0/korb && cd korb
-uv sync
-
-# Install with dev tools (black, isort)
-uv sync --group dev
-```
-
-After `uv sync`, the `korb` CLI is available inside the virtual environment. Use `uv run korb` to invoke it, or activate the venv with `source .venv/bin/activate` and run `korb` directly.
-
----
-
 ## Commands
 
 ### `download` — Fetch HTML data
 
 ```bash
-# Download results + schedule for a league
 uv run korb --ligaid 12345 download
-
-# Refresh all previously downloaded leagues at once
-uv run korb download --all
+uv run korb download --all   # refresh all previously downloaded leagues
 ```
 
 Saves `ergebnisse.html` and `spielplan.html` into `files/<ligaid>/`.
-
-The `--all` / `-a` flag scans the `files/` directory for all previously
-downloaded league IDs and re-downloads each one. Useful for bulk-refreshing
-data across multiple leagues.
 
 ### `standings` — League table
 
@@ -99,61 +80,25 @@ data across multiple leagues.
 uv run korb --ligaid 12345 standings
 ```
 
-```
- #  Team                GP   W   L   D     PF    PA   Diff  Pts   Avg PF  Avg PA
-----------------------------------------------------------------------------------
- 1  Thunder Academy     12   9   3   0   1248   847   +401   18    104.0    70.6
- 2  Riverside Hawks     11   9   2   0    952   668   +284   18     86.5    60.7
- 3  Metro Wolves        11   8   3   0    813   694   +119   16     73.9    63.1
-...
-```
-
-### `ergebnisse` — All game results
+### `ergebnisse` — Game results
 
 ```bash
-# All completed results
 uv run korb --ligaid 12345 ergebnisse
-
-# Filter by team (partial, case-insensitive)
 uv run korb --ligaid 12345 ergebnisse --team "Hawks"
-
-# JSON output
-uv run korb --json --ligaid 12345 ergebnisse
-```
-
-```
-======================================================================
-  Ergebnisse — MFR U12 mix Bezirksliga Nord
-======================================================================
-
-   Datum            Heim              Gast              Ergebnis    Diff
------------------------------------------------------------------------
-1  15.01.26 10:00   Team Alpha        Team Beta           79:75      +4
-2  15.01.26 12:00   Team Gamma        Team Delta          60:60       0
-3  22.01.26 15:00   Team Beta         Team Alpha          82:70     +12
 ```
 
 ### `team` — Deep dive on a single team
 
 ```bash
-# Basic results
 uv run korb --ligaid 12345 team "Thunder"
-
-# With bar chart + quality metrics for last 5 games
 uv run korb --ligaid 12345 team "Thunder" --bars --last-k 5 --metrics
 ```
 
 ### `schedule` — Game calendar
 
 ```bash
-# All upcoming games
 uv run korb --ligaid 12345 schedule --pending
-
-# Filter by team + mark back-to-back ⚡ fixtures
 uv run korb --ligaid 12345 schedule --team "Hawks" --pending --b2b
-
-# Include cancelled games
-uv run korb --ligaid 12345 schedule --all
 ```
 
 ### `predict` — Forecast final standings
@@ -162,177 +107,22 @@ uv run korb --ligaid 12345 schedule --all
 uv run korb --ligaid 12345 predict
 ```
 
-Uses a multiplicative efficiency model with recency weighting, recent form blending, home advantage, and back-to-back fatigue modelling.
-
 ### `top` — Quick leaderboard
 
 ```bash
 uv run korb --ligaid 12345 top -n 5
 ```
 
-### `skill` — Print AI skill prompts
+### Global flags
 
-```bash
-# List available skills
-uv run korb skill --list
-
-# Print a specific skill prompt
-uv run korb skill analysis
-uv run korb skill prediction
-```
-
-Ships two built-in skills: `analysis` (team deep-dive) and `prediction` (league top-N forecast).
-
-### `--download` — Fetch fresh data before any command
-
-```bash
-# Download + show standings in one step
-uv run korb --ligaid 12345 --download standings
-
-# Download + predict
-uv run korb --ligaid 12345 -d predict
-```
-
-### `--json` — Machine-readable output
-
-Add `--json` before any subcommand to get JSON instead of tables:
-
-```bash
-uv run korb --json --ligaid 12345 standings
-uv run korb --json --ligaid 12345 team "Hawks"
-uv run korb --json --ligaid 12345 ergebnisse
-uv run korb --json --ligaid 12345 ergebnisse --team "Hawks"
-uv run korb --json --ligaid 12345 schedule --pending
-uv run korb --json --ligaid 12345 predict
-uv run korb --json --ligaid 12345 top -n 3
-```
-
----
-
-## CLI Reference
-
-```
-$ uv run korb --help
-
-usage: korb [-h] [--version] [--results RESULTS] [--schedule SCHEDULE]
-            [--json] [--ligaid LIGAID] [--download]
-            {standings,team,ergebnisse,schedule,predict,top,download,skill} ...
-
-Basketball league analysis tools
-
-positional arguments:
-  {standings,team,ergebnisse,schedule,predict,top,download,skill}
-    standings           Display league standings
-    team                Display results for a team
-    ergebnisse          Display game results
-    schedule            Display game schedule
-    predict             Predict final standings
-    top                 Show top teams from standings
-    download            Download results & schedule HTML
-    skill               Print a skill prompt or list available skills
-
-options:
-  -h, --help            show this help message and exit
-  --version, -V         show program's version number and exit
-  --results, -r RESULTS HTML results file path
-  --schedule, -s SCHEDULE
-                        HTML schedule file path
-  --json                Output as JSON instead of formatted tables
-  --ligaid, -l LIGAID  Liga ID (e.g. 51491)
-  --download, -d        Download latest data before running the command
-```
-
-<details>
-<summary><code>standings --help</code></summary>
-
-```
-usage: korb standings [-h]
-
-options:
-  -h, --help  show this help message and exit
-```
-</details>
-
-<details>
-<summary><code>team --help</code></summary>
-
-```
-usage: korb team [-h] [--bars] [--last-k LAST_K] [--metrics] name
-
-positional arguments:
-  name             Team name (e.g., 'Hawks')
-
-options:
-  -h, --help       show this help message and exit
-  --bars, -b       Show point differential bar chart
-  --last-k LAST_K  Analyze only the most recent K games
-  --metrics        Show win-rate + margin quality metrics
-```
-</details>
-
-<details>
-<summary><code>schedule --help</code></summary>
-
-```
-usage: korb schedule [-h] [--all] [--pending] [--team TEAM] [--b2b]
-
-options:
-  -h, --help       show this help message and exit
-  --all, -a        Show cancelled games
-  --pending, -p    Show only pending games
-  --team, -t TEAM  Filter by team name (partial match)
-  --b2b            Mark back-to-back fixtures (≤36h)
-```
-</details>
-
-<details>
-<summary><code>ergebnisse --help</code></summary>
-
-```
-usage: korb ergebnisse [-h] [--team TEAM]
-
-options:
-  -h, --help       show this help message and exit
-  --team, -t TEAM  Filter by team name (partial match)
-```
-</details>
-
-<details>
-<summary><code>predict --help</code></summary>
-
-```
-usage: korb predict [-h]
-
-options:
-  -h, --help  show this help message and exit
-```
-</details>
-
-<details>
-<summary><code>top --help</code></summary>
-
-```
-usage: korb top [-h] [-n N]
-
-options:
-  -h, --help  show this help message and exit
-  -n N        How many teams to show (default: 3)
-```
-</details>
-
-<details>
-<summary><code>download --help</code></summary>
-
-```
-usage: korb download [-h] [--all]
-
-options:
-  -h, --help  show this help message and exit
-  --all, -a   Refresh all previously downloaded leagues
-```
-</details>
-
----
+| Flag | Description |
+|---|---|
+| `--json` | Output as JSON instead of formatted tables |
+| `--download`, `-d` | Fetch fresh data before running the command |
+| `--ligaid`, `-l` | Liga ID (resolves file paths automatically) |
+| `--results`, `-r` | Explicit path to HTML results file |
+| `--schedule`, `-s` | Explicit path to HTML schedule file |
+| `--version`, `-V` | Show version |
 
 ## How Predictions Work
 
@@ -348,40 +138,19 @@ The `predict` command estimates final standings using a **multiplicative efficie
 | **B2B fatigue** | ≤36h between games → 5% offense/defense penalty |
 | **New teams** | <3 games → ratings blended toward league average |
 | **No draws** | Ties broken by home advantage (basketball has OT) |
-| **No double-counting** | Already-played games excluded from schedule scan |
-
----
-
-## 🧠 Skills
-
-The `skills/` directory contains **reusable AI skill definitions** — structured prompts that can be loaded by an AI assistant (e.g. Roo/Cline) to run analysis workflows using the CLI.
-
-| Skill | Output | Description |
-|---|---|---|
-| [`SKILL_TEAM_ANALYSIS.md`](skills/SKILL_TEAM_ANALYSIS.md) | Paragraph | Short team summary (position, identity, form, outlook) — ready for a webpage card |
-| [`SKILL_LEAGUE_TOP_N_ANALYSIS.md`](skills/SKILL_LEAGUE_TOP_N_ANALYSIS.md) | Table + paragraph | Predicted final standings table with a brief explanation |
-
-Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output directly (no file saved). To use a skill, point your AI assistant at the markdown file or load it as a skill definition.
-
----
 
 ## Project Structure
 
 ```
-├── korb/
-│   ├── __init__.py      # Package marker
-│   ├── __main__.py      # CLI entry point & download command
-│   ├── core.py          # Shared models, HTML parsing, utilities
-│   ├── ergebnisse.py    # Game results viewer & filter
-│   ├── predict.py       # Multiplicative efficiency prediction model
-│   ├── schedule.py      # HTML schedule parser & filters
-│   ├── standings.py     # Standings calculator
-│   └── team.py          # Team results viewer & metrics
-├── skills/              # AI skill definitions for automated analysis
-├── files/               # Downloaded HTML data (git-ignored)
-├── tests/               # Tests
-├── pyproject.toml       # Project metadata & uv config
-└── README.md
+korb/
+├── __init__.py      # Package marker & version
+├── __main__.py      # CLI entry point & download command
+├── core.py          # Shared models, HTML parsing, utilities
+├── ergebnisse.py    # Game results viewer & filter
+├── predict.py       # Multiplicative efficiency prediction model
+├── schedule.py      # HTML schedule parser & filters
+├── standings.py     # Standings calculator
+└── team.py          # Team results viewer & metrics
 ```
 
 **Requirements:** Python 3.10+ · [uv](https://docs.astral.sh/uv/) · No runtime dependencies
@@ -390,12 +159,20 @@ Both skills accept a `LANGUAGE` parameter (`en`/`de`/`es`) and return output dir
 > current working directory (`files/<ligaid>/`). Run `korb` from the project root
 > or pass explicit `--results` / `--schedule` paths.
 
-### Dev tools
+## Development
 
 ```bash
-# Format code
-uv run black korb/
+# Install with dev tools
+uv sync --group dev
 
-# Sort imports
-uv run isort korb/
+# Lint & format
+uv run ruff check korb/ tests/
+uv run ruff format korb/ tests/
+
+# Run tests
+uv run pytest
 ```
+
+## License
+
+[MIT](LICENSE)

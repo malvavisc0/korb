@@ -8,7 +8,6 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 from dataclasses import dataclass
 from datetime import datetime
 from statistics import pstdev
-from typing import Optional
 
 from korb.core import DATE_FMT, Game, LeagueInfo, print_header, read_games
 
@@ -137,7 +136,7 @@ def print_results(
         return
 
     ow = max(3, max(len(r.opponent) for r in results))
-    hdr = f"{'Opp':<{ow}}  {'H/A':>4}  " f"{'Score':>10}  {'Diff':>6}  {'Result':>6}"
+    hdr = f"{'Opp':<{ow}}  {'H/A':>4}  {'Score':>10}  {'Diff':>6}  {'Result':>6}"
     print(hdr)
     print("-" * len(hdr))
 
@@ -168,7 +167,7 @@ def print_results(
     print(f"Summary: {record} ({games} games)")
     print(
         f"Points: {total_pts} scored, {opp_pts} allowed "
-        f"(avg: {total_pts/games:.1f} - {opp_pts/games:.1f})"
+        f"(avg: {total_pts / games:.1f} - {opp_pts / games:.1f})"
     )
 
 
@@ -239,7 +238,7 @@ def print_bars(results: list[GameResult]) -> None:
     print(" " * (lw + 2) + " " + nums)
 
 
-def _last_k(results: list[GameResult], last_k: Optional[int]) -> list[GameResult]:
+def _last_k(results: list[GameResult], last_k: int | None) -> list[GameResult]:
     """Return the most recent K games.
 
     `read_games()` yields games newest-first. `get_team_results()` preserves
@@ -291,7 +290,7 @@ def _compute_metrics(results: list[GameResult]) -> dict[str, float]:
 def print_metrics(
     results: list[GameResult],
     league_name: str = "Basketball League",
-    last_k: Optional[int] = None,
+    last_k: int | None = None,
 ) -> None:
     """Print computed metrics for the (optionally filtered) result list."""
 

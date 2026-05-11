@@ -50,9 +50,7 @@ class TestCalcStrength:
     def test_empty_games(self, tmp_path):
         f = tmp_path / "empty.html"
         f.write_text(
-            "<html><head>"
-            "<title>Ergebnisse - L (x)</title>"
-            "</head><body></body></html>"
+            "<html><head><title>Ergebnisse - L (x)</title></head><body></body></html>"
         )
         teams, ratings, avg = calc_strength(str(f))
         assert teams == {}
@@ -64,7 +62,7 @@ class TestCalcStrength:
         assert len(teams) > 0
         assert len(ratings) > 0
         assert avg > 0
-        for name, (off, def_) in ratings.items():
+        for _name, (off, def_) in ratings.items():
             assert off > 0
             assert def_ > 0
 
