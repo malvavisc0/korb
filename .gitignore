@@ -6,6 +6,11 @@ __pycache__/
 dist/
 build/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+
 # Lock file
 uv.lock
 
