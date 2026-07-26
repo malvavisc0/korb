@@ -1,7 +1,7 @@
 """Schedule parser for DBB (Deutscher Basketball Bund) JSP platform.
 
 Parses game schedule from basketball-bund.net HTML tables.
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 from dataclasses import dataclass

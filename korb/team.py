@@ -2,7 +2,7 @@
 
 Displays all game results for a specific team with scores,
 differentials, and win/loss/draw summary.
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 from dataclasses import dataclass
@@ -135,12 +135,16 @@ def print_results(
         print(f"No results found for '{team_name}'")
         return
 
-    ow = max(3, max(len(r.opponent) for r in results))
+    # Display oldest-first so the row order and sparkline read
+    # left-to-right chronologically (results arrive newest-first).
+    chronological = list(reversed(results))
+
+    ow = max(3, max(len(r.opponent) for r in chronological))
     hdr = f"{'Opp':<{ow}}  {'H/A':>4}  {'Score':>10}  {'Diff':>6}  {'Result':>6}"
     print(hdr)
     print("-" * len(hdr))
 
-    for r in results:
+    for r in chronological:
         score_str = f"{r.our_score} - {r.opp_score}"
         diff_str = f"+{r.diff}" if r.diff > 0 else str(r.diff)
         print(
@@ -150,10 +154,10 @@ def print_results(
         )
 
     # Sparkline row
-    sparkline = "".join(_sparkline_char(r.result) for r in results)
+    sparkline = "".join(_sparkline_char(r.result) for r in chronological)
     print(f"\n{sparkline}  (W=█, L=▄, D=─)")
 
-    _print_summary(results)
+    _print_summary(chronological)
 
 
 def _print_summary(results: list[GameResult]) -> None:
@@ -251,7 +255,8 @@ def print_bars(results: list[GameResult]) -> None:
     if not results:
         return
 
-    diffs = [r.diff for r in results]
+    # Oldest-first so the x-axis (1..N) reads chronologically.
+    diffs = [r.diff for r in reversed(results)]
     max_pos, max_neg = _pos_neg_extent(diffs)
 
     half = 6

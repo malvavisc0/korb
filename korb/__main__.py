@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Basketball league CLI for DBB (Deutscher Basketball Bund) data.
 
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 import argparse
@@ -54,20 +54,36 @@ def _liga_meta(
     }
 
 
-def _resolve_results(args: argparse.Namespace, label: str) -> str:
-    """Resolve the results HTML path from --results or --ligaid.
+def _resolve_path(
+    explicit: str | None, ligaid: int | None, filename: str, flag: str, label: str
+) -> str:
+    """Resolve an HTML path from an explicit flag value or --ligaid.
 
     Exits with an error if neither is provided.
     """
-    if args.results is not None:
-        return args.results
-    if args.ligaid is None:
+    if explicit is not None:
+        return explicit
+    if ligaid is None:
         print(
-            f"Error: pass --results PATH or --ligaid LIGAID for {label}.",
+            f"Error: pass {flag} PATH or --ligaid LIGAID for {label}.",
             file=sys.stderr,
         )
         sys.exit(1)
-    return str(Path("files") / str(args.ligaid) / "ergebnisse.html")
+    return str(Path("files") / str(ligaid) / filename)
+
+
+def _resolve_results(args: argparse.Namespace, label: str) -> str:
+    """Resolve the results HTML path from --results or --ligaid."""
+    return _resolve_path(
+        args.results, args.ligaid, "ergebnisse.html", "--results", label
+    )
+
+
+def _resolve_schedule(args: argparse.Namespace, label: str) -> str:
+    """Resolve the schedule HTML path from --schedule or --ligaid."""
+    return _resolve_path(
+        args.schedule, args.ligaid, "spielplan.html", "--schedule", label
+    )
 
 
 def cmd_standings(args: argparse.Namespace) -> None:
@@ -110,16 +126,7 @@ def cmd_team(args: argparse.Namespace) -> None:
 
 def cmd_ergebnisse(args: argparse.Namespace) -> None:
     """Handle 'ergebnisse' subcommand."""
-    fp = args.results
-    if fp is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --results PATH or --ligaid LIGAID for ergebnisse.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
-
+    fp = _resolve_results(args, "ergebnisse")
     games, league_info = read_games(fp)
     filtered = filter_ergebnisse(games, team=args.team)
     filtered.sort(key=lambda g: g.date)
@@ -145,16 +152,7 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
 
 def cmd_schedule(args: argparse.Namespace) -> None:
     """Handle 'schedule' subcommand."""
-    html = args.schedule
-    if html is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --schedule PATH or --ligaid LIGAID for schedule.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        html = str(Path("files") / str(args.ligaid) / "spielplan.html")
-
+    html = _resolve_schedule(args, "schedule")
     games, league_info = parse_schedule(html)
     filtered = filter_schedule(
         games, show_all=args.all, pending=args.pending, team=args.team

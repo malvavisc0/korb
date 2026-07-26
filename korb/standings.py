@@ -1,7 +1,7 @@
 """League standings calculator for DBB (Deutscher Basketball Bund) data.
 
 Calculates and displays standings with points, differentials, and averages.
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 from collections import defaultdict

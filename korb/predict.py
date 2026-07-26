@@ -3,7 +3,7 @@
 Uses a multiplicative efficiency model: each team's offensive and
 defensive ratings (relative to league average) are multiplied to
 predict matchup scores.  Recent games are weighted more heavily.
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 from collections import defaultdict

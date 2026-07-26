@@ -9,6 +9,7 @@ from korb.team import (
     _result_code,
     _sparkline_char,
     get_team_results,
+    print_results,
 )
 
 
@@ -114,3 +115,19 @@ class TestGameResultToDict:
         assert d["opp_score"] == 75
         assert d["result"] == "W"
         assert d["diff"] == 4
+
+
+class TestPrintResultsOrder:
+    def test_table_and_sparkline_are_chronological(self, capsys):
+        # Input is newest-first (as get_team_results returns).
+        newest_first = [
+            GameResult(datetime(2026, 3, 1, 10, 0), "Newest", "Home", 90, 80, "W"),
+            GameResult(datetime(2026, 2, 1, 10, 0), "Middle", "Away", 60, 70, "L"),
+            GameResult(datetime(2026, 1, 1, 10, 0), "Oldest", "Home", 55, 55, "D"),
+        ]
+        print_results("My Team", newest_first)
+        out = capsys.readouterr().out
+        # Oldest opponent must be printed before the newest.
+        assert out.index("Oldest") < out.index("Middle") < out.index("Newest")
+        # Sparkline reads oldest->newest: Draw, Loss, Win.
+        assert "─▄█" in out

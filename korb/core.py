@@ -1,7 +1,7 @@
 """Shared models and utilities for DBB (Deutscher Basketball Bund) analysis.
 
 Provides common types, HTML parsing, and date helpers used across modules.
-Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
+Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 import re
