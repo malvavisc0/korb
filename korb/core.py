@@ -49,26 +49,28 @@ class Game:
     away_score: int
 
 
-def parse_date(date_str: str) -> datetime | None:
+def parse_date(date_str: str | None) -> datetime | None:
     """Parse date string in format 'DD.MM.YYYY HH:MM'.
 
     Args:
-        date_str: Date string to parse.
+        date_str: Date string to parse, or None.
 
     Returns:
         Parsed datetime or None if invalid format.
     """
+    if date_str is None:
+        return None
     try:
         return datetime.strptime(date_str.strip(), DATE_FMT).replace(tzinfo=LOCAL_TZ)
-    except (ValueError, AttributeError):
+    except ValueError:
         return None
 
 
-def parse_score(score_str: str) -> tuple[int | None, int | None]:
+def parse_score(score_str: str | None) -> tuple[int | None, int | None]:
     """Parse score string in format '79 : 75'.
 
     Args:
-        score_str: Score string to parse.
+        score_str: Score string to parse, or None.
 
     Returns:
         Tuple of (home_score, away_score) or (None, None) if invalid.
