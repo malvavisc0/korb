@@ -46,7 +46,7 @@ class TeamStats:
         """Average points allowed per game."""
         return self.pa / self.gp if self.gp else 0.0
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serializable dict including computed properties."""
         return {
             "gp": self.gp,
@@ -69,7 +69,7 @@ class Standing:
     name: str
     stats: TeamStats
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serializable dict."""
         return {"name": self.name, **self.stats.to_dict()}
 

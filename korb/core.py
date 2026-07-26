@@ -10,8 +10,11 @@ from dataclasses import dataclass
 from datetime import datetime
 from html.parser import HTMLParser
 from typing import Final
+from zoneinfo import ZoneInfo
 
 DATE_FMT: Final[str] = "%d.%m.%Y %H:%M"
+# DBB schedule times are local German wall-clock times.
+LOCAL_TZ: Final[ZoneInfo] = ZoneInfo("Europe/Berlin")
 _LEAGUE_FALLBACK: Final[str] = "Basketball League"
 
 # Regex for league name in DBB HTML titles like:
@@ -30,7 +33,7 @@ class LeagueInfo:
     name: str
     number: int | None = None
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serializable dict."""
         return {"liga_name": self.name, "liga_number": self.number}
 
@@ -56,7 +59,7 @@ def parse_date(date_str: str) -> datetime | None:
         Parsed datetime or None if invalid format.
     """
     try:
-        return datetime.strptime(date_str.strip(), DATE_FMT)
+        return datetime.strptime(date_str.strip(), DATE_FMT).replace(tzinfo=LOCAL_TZ)
     except (ValueError, AttributeError):
         return None
 
@@ -101,12 +104,11 @@ def read_file_safe(filepath: str) -> str:
         sys.exit(1)
 
 
-class _HTMLResultsParser(HTMLParser):
-    """Parse basketball-bund.net HTML results tables."""
+class _DBBRowParser(HTMLParser):
+    """Shared <td>/<tr>/<strike> row-scanning state machine for DBB HTML tables."""
 
     def __init__(self) -> None:
         super().__init__()
-        self.games: list[Game] = []
         self._in_td = False
         self._td_depth = 0
         self._cells: list[str] = []
@@ -136,6 +138,17 @@ class _HTMLResultsParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         if self._in_td and self._td_depth == 1:
             self._current_cell += data
+
+    def _finalize_row(self) -> None:
+        raise NotImplementedError
+
+
+class _HTMLResultsParser(_DBBRowParser):
+    """Parse basketball-bund.net HTML results tables."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.games: list[Game] = []
 
     def _finalize_row(self) -> None:
         """Parse completed row into Game if valid."""

@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from korb.core import (
+    LOCAL_TZ,
     LeagueInfo,
     _HTMLResultsParser,
     extract_league_info,
@@ -15,7 +16,7 @@ from korb.core import (
 class TestParseDate:
     def test_valid_date(self):
         result = parse_date("15.01.2026 10:00")
-        assert result == datetime(2026, 1, 15, 10, 0)
+        assert result == datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
 
     def test_invalid_format(self):
         assert parse_date("2026-01-15") is None
@@ -25,7 +26,7 @@ class TestParseDate:
 
     def test_whitespace(self):
         result = parse_date("  15.01.2026 10:00  ")
-        assert result == datetime(2026, 1, 15, 10, 0)
+        assert result == datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
 
     def test_empty_string(self):
         assert parse_date("") is None

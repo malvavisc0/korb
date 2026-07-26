@@ -51,9 +51,10 @@ features = ["dev"]
 
 [dependency-groups]
 dev = [
-    "ruff",
     "pytest",
     "pytest-cov",
+    "ruff",
+    "basedpyright"
 ]
 
 [tool.pytest.ini_options]

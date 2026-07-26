@@ -37,8 +37,7 @@ def _recency_weight(game: Game, ref_ts: float) -> float:
         Weight between 0 and 1, decreasing with age.
     """
     days_ago = (ref_ts - game.date.timestamp()) / 86400
-    if days_ago < 0:
-        days_ago = 0
+    days_ago = max(days_ago, 0)
     return exp(-0.693 * days_ago / RECENCY_HALF_LIFE)
 
 
@@ -166,9 +165,9 @@ def _build_ratings(
         Dict mapping team name to (off_rating, pts_allowed_rating).
     """
     ratings: dict[str, tuple[float, float]] = {}
-    for name in w_gp:
-        avg_pf = w_pf[name] / w_gp[name]
-        avg_pa = w_pa[name] / w_gp[name]
+    for name, gp_weight in w_gp.items():
+        avg_pf = w_pf[name] / gp_weight
+        avg_pa = w_pa[name] / gp_weight
         raw_off = avg_pf / league_avg
         raw_def = avg_pa / league_avg
 
@@ -244,6 +243,69 @@ def predict_game(
     return "away", ph, pa
 
 
+def _copy_stats(teams_base: dict[str, TeamStats]) -> dict[str, TeamStats]:
+    """Deep-copy current team stats into a fresh defaultdict."""
+    teams: dict[str, TeamStats] = defaultdict(TeamStats)
+    for name, st in teams_base.items():
+        t = teams[name]
+        t.gp, t.w, t.l, t.d, t.pf, t.pa = st.gp, st.w, st.l, st.d, st.pf, st.pa
+    return teams
+
+
+def _pending_games(html_path: str, played: list[Game]) -> list[ScheduledGame]:
+    """Return future scheduled games not already present in results."""
+    played_keys = {(g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played}
+    schedule, _ = parse_schedule(html_path)
+    pending = [
+        g
+        for g in filter_schedule(schedule, pending=True)
+        if (g.home, g.away, g.date.strftime("%d.%m.%Y")) not in played_keys
+    ]
+    pending.sort(key=lambda g: g.date)
+    return pending
+
+
+def _last_game_times(played: list[Game]) -> dict[str, float]:
+    """Map each team to the timestamp of its most recent played game."""
+    last_game_ts: dict[str, float] = {}
+    for g in played:
+        ts = g.date.timestamp()
+        for name in (g.home, g.away):
+            if ts > last_game_ts.get(name, 0):
+                last_game_ts[name] = ts
+    return last_game_ts
+
+
+def _fatigue(
+    name: str, gt: float, last_game_ts: dict[str, float], threshold_s: float
+) -> float:
+    """Return the fatigue multiplier for a team playing at time ``gt``."""
+    if name in last_game_ts and (gt - last_game_ts[name]) <= threshold_s:
+        return FATIGUE_PENALTY
+    return 1.0
+
+
+def _apply_result(
+    home: TeamStats, away: TeamStats, winner: str, hs: int, as_: int
+) -> None:
+    """Update both teams' stats with a predicted game result."""
+    home.gp += 1
+    away.gp += 1
+    home.pf += hs
+    home.pa += as_
+    away.pf += as_
+    away.pa += hs
+    if winner == "home":
+        home.w += 1
+        away.l += 1
+    elif winner == "away":
+        away.w += 1
+        home.l += 1
+    else:
+        home.d += 1
+        away.d += 1
+
+
 def predict_standings(
     results_path: str,
     html_path: str,
@@ -263,56 +325,20 @@ def predict_standings(
         (game, winner, home_score, away_score) tuples, and league_info
         contains league metadata.
     """
-    rp = results_path
-    teams_base, ratings, league_avg = calc_strength(rp)
-    teams: dict[str, TeamStats] = defaultdict(TeamStats)
+    teams_base, ratings, league_avg = calc_strength(results_path)
+    teams = _copy_stats(teams_base)
 
-    for name, st in teams_base.items():
-        t = teams[name]
-        t.gp = st.gp
-        t.w = st.w
-        t.l = st.l
-        t.d = st.d
-        t.pf = st.pf
-        t.pa = st.pa
+    played, league_info = read_games(results_path)
+    pending = _pending_games(html_path, played)
 
-    played, league_info = read_games(rp)
-    played_keys: set[tuple[str, str, str]] = {
-        (g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played
-    }
-
-    schedule, _ = parse_schedule(html_path)
-    pending = [
-        g
-        for g in filter_schedule(schedule, pending=True)
-        if (g.home, g.away, g.date.strftime("%d.%m.%Y")) not in played_keys
-    ]
-
-    pending.sort(key=lambda g: g.date)
-    last_game_ts: dict[str, float] = {}
-    for g in played:
-        ts = g.date.timestamp()
-        for name in (g.home, g.away):
-            if ts > last_game_ts.get(name, 0):
-                last_game_ts[name] = ts
-
+    last_game_ts = _last_game_times(played)
     threshold_s = FATIGUE_THRESHOLD_H * 3600
 
     preds: list[tuple[ScheduledGame, str, int, int]] = []
     for game in pending:
         gt = game.date.timestamp()
-        h_fat = (
-            FATIGUE_PENALTY
-            if game.home in last_game_ts
-            and (gt - last_game_ts[game.home]) <= threshold_s
-            else 1.0
-        )
-        a_fat = (
-            FATIGUE_PENALTY
-            if game.away in last_game_ts
-            and (gt - last_game_ts[game.away]) <= threshold_s
-            else 1.0
-        )
+        h_fat = _fatigue(game.home, gt, last_game_ts, threshold_s)
+        a_fat = _fatigue(game.away, gt, last_game_ts, threshold_s)
 
         winner, hs, as_ = predict_game(
             game.home,
@@ -326,24 +352,7 @@ def predict_standings(
         last_game_ts[game.home] = gt
         last_game_ts[game.away] = gt
         preds.append((game, winner, hs, as_))
-
-        h, a = teams[game.home], teams[game.away]
-        h.gp += 1
-        a.gp += 1
-        h.pf += hs
-        h.pa += as_
-        a.pf += as_
-        a.pa += hs
-
-        if winner == "home":
-            h.w += 1
-            a.l += 1
-        elif winner == "away":
-            a.w += 1
-            h.l += 1
-        else:
-            h.d += 1
-            a.d += 1
+        _apply_result(teams[game.home], teams[game.away], winner, hs, as_)
 
     standings = [Standing(n, s) for n, s in teams.items()]
     standings.sort(

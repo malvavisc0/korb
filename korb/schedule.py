@@ -6,10 +6,11 @@ Target: DBB Version ≤11.50.0-623b018 (legacy JSP platform).
 
 from dataclasses import dataclass
 from datetime import datetime
-from html.parser import HTMLParser
 
 from korb.core import (
+    LOCAL_TZ,
     LeagueInfo,
+    _DBBRowParser,
     extract_league_info,
     parse_date,
     print_header,
@@ -29,7 +30,7 @@ class ScheduledGame:
     venue: str
     cancelled: bool
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         """Serializable dict."""
         return {
             "nr": self.nr,
@@ -42,18 +43,13 @@ class ScheduledGame:
         }
 
 
-class _HTMLScheduleParser(HTMLParser):
+class _HTMLScheduleParser(_DBBRowParser):
     """Parse basketball-bund.net HTML schedule tables."""
 
     def __init__(self) -> None:
         """Initialize the parser state."""
         super().__init__()
         self.games: list[ScheduledGame] = []
-        self._in_td = False
-        self._td_depth = 0
-        self._cells: list[str] = []
-        self._current_cell = ""
-        self._row_cancelled = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         """Track table cell and cancellation markers in HTML.
@@ -62,42 +58,11 @@ class _HTMLScheduleParser(HTMLParser):
             tag: HTML tag name.
             attrs: List of (name, value) attribute pairs.
         """
-        if tag == "td":
-            if self._td_depth == 0:
-                self._in_td = True
-                self._current_cell = ""
-            self._td_depth += 1
-        elif tag == "strike":
-            self._row_cancelled = True
-        elif tag == "img":
+        super().handle_starttag(tag, attrs)
+        if tag == "img":
             for attr_name, attr_val in attrs:
                 if attr_name == "title" and attr_val == "Spiel abgesagt":
                     self._row_cancelled = True
-
-    def handle_endtag(self, tag: str) -> None:
-        """Finalize cells and rows when closing tags encountered.
-
-        Args:
-            tag: HTML tag name.
-        """
-        if tag == "td":
-            self._td_depth -= 1
-            if self._td_depth == 0:
-                self._cells.append(self._current_cell.strip())
-                self._in_td = False
-        elif tag == "tr":
-            self._finalize_row()
-            self._cells = []
-            self._row_cancelled = False
-
-    def handle_data(self, data: str) -> None:
-        """Accumulate text content within table cells.
-
-        Args:
-            data: Text content from HTML.
-        """
-        if self._in_td and self._td_depth == 1:
-            self._current_cell += data
 
     def _finalize_row(self) -> None:
         """Parse completed row into ScheduledGame if valid."""
@@ -158,14 +123,18 @@ def filter_schedule(
     Returns:
         Filtered list of ScheduledGame objects.
     """
-    now = datetime.now()
-    filtered = [g for g in games if not g.cancelled or show_all]
+    filtered = games if show_all else [g for g in games if not g.cancelled]
     if pending:
+        now = datetime.now(LOCAL_TZ)
         filtered = [g for g in filtered if g.date >= now]
     if team:
-        t = team.lower()
-        filtered = [g for g in filtered if t in g.home.lower() or t in g.away.lower()]
+        filtered = [g for g in filtered if _matches_team(g, team.lower())]
     return filtered
+
+
+def _matches_team(game: ScheduledGame, needle: str) -> bool:
+    """True if lowercase ``needle`` appears in either team name."""
+    return needle in game.home.lower() or needle in game.away.lower()
 
 
 def is_season_finalized(html_path: str) -> tuple[bool, int]:
@@ -213,6 +182,21 @@ def mark_back_to_back(
     return b2b
 
 
+def _cancel_len(name: str, cancelled: bool) -> int:
+    """Displayed length of a team name, allowing for the ' [X]' marker."""
+    return len(name) + (4 if cancelled else 0)
+
+
+def _schedule_widths(games: list[ScheduledGame]) -> tuple[int, int, int, int, int]:
+    """Return (nr, day, home, away, venue) column widths."""
+    nr_w = max(5, max(len(str(g.nr)) for g in games))
+    day_w = max(3, max(len(str(g.day)) for g in games))
+    home_w = max(4, max(_cancel_len(g.home, g.cancelled) for g in games))
+    away_w = max(4, max(_cancel_len(g.away, g.cancelled) for g in games))
+    venue_w = max(5, max(len(g.venue) for g in games))
+    return nr_w, day_w, home_w, away_w, venue_w
+
+
 def print_schedule(
     games: list[ScheduledGame],
     league_name: str = "Basketball League",
@@ -230,20 +214,8 @@ def print_schedule(
         return
 
     b2b_flags = mark_back_to_back(games) if b2b else {}
-
-    nr_w = max(5, max(len(str(g.nr)) for g in games))
-    day_w = max(3, max(len(str(g.day)) for g in games))
+    nr_w, day_w, home_w, away_w, venue_w = _schedule_widths(games)
     date_w = 16
-
-    home_w = max(
-        4,
-        max(len(g.home) + (4 if g.cancelled else 0) for g in games),
-    )
-    away_w = max(
-        4,
-        max(len(g.away) + (4 if g.cancelled else 0) for g in games),
-    )
-    venue_w = max(5, max(len(g.venue) for g in games))
 
     print_header("Schedule", league_name)
 
@@ -259,9 +231,7 @@ def print_schedule(
         home = f"{g.home} [X]" if g.cancelled else g.home
         away = f"{g.away} [X]" if g.cancelled else g.away
         date_str = g.date.strftime("%d.%m.%y %H:%M")
-        tag = str(g.day)
-        if b2b_flags.get(i, False):
-            tag = f"{tag} ⚡"
+        tag = f"{g.day} ⚡" if b2b_flags.get(i, False) else str(g.day)
 
         print(
             f"{g.nr:<{nr_w}}  {tag:>{day_w}}  "

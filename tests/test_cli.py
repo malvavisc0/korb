@@ -97,7 +97,7 @@ class TestCmdTeam:
 
 
 class TestCmdSchedule:
-    def test_pending_filter(self, spielplan_path, capsys):
+    def test_pending_filter(self, spielplan_path, capsys, frozen_now):
         args = _make_args(
             schedule=spielplan_path,
             ligaid=None,
@@ -162,7 +162,9 @@ class TestCmdPredict:
         with pytest.raises(SystemExit):
             cmd_predict(args)
 
-    def test_normal_execution(self, ergebnisse_path, spielplan_path, capsys):
+    def test_normal_execution(
+        self, ergebnisse_path, spielplan_path, capsys, frozen_now
+    ):
         args = _make_args(
             results=ergebnisse_path,
             schedule=spielplan_path,

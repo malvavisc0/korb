@@ -26,7 +26,7 @@ from .schedule import (
     parse_schedule,
     print_schedule,
 )
-from .standings import calculate_standings, print_table
+from .standings import Standing, calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
 
 
@@ -38,7 +38,7 @@ def _json_out(data: object) -> None:
 def _liga_meta(
     league_info: LeagueInfo,
     ligaid: int | None,
-) -> dict:
+) -> dict[str, object]:
     """Build liga metadata dict for JSON output.
 
     Args:
@@ -54,18 +54,25 @@ def _liga_meta(
     }
 
 
+def _resolve_results(args: argparse.Namespace, label: str) -> str:
+    """Resolve the results HTML path from --results or --ligaid.
+
+    Exits with an error if neither is provided.
+    """
+    if args.results is not None:
+        return args.results
+    if args.ligaid is None:
+        print(
+            f"Error: pass --results PATH or --ligaid LIGAID for {label}.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    return str(Path("files") / str(args.ligaid) / "ergebnisse.html")
+
+
 def cmd_standings(args: argparse.Namespace) -> None:
     """Handle 'standings' subcommand."""
-    fp = args.results
-    if fp is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --results PATH or --ligaid LIGAID for standings.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
-
+    fp = _resolve_results(args, "standings")
     standings, league_info = calculate_standings(fp)
     if args.json:
         _json_out(
@@ -80,16 +87,7 @@ def cmd_standings(args: argparse.Namespace) -> None:
 
 def cmd_team(args: argparse.Namespace) -> None:
     """Handle 'team' subcommand."""
-    fp = args.results
-    if fp is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --results PATH or --ligaid LIGAID for team results.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
-
+    fp = _resolve_results(args, "team results")
     results, league_info = get_team_results(args.name, fp)
     if args.json:
         data = [r.to_dict() for r in results]
@@ -189,7 +187,7 @@ def cmd_predict(args: argparse.Namespace) -> None:
         sp = sp or str(base / "spielplan.html")
 
     # Check if season is finalized
-    finalized, pending_count = is_season_finalized(sp)
+    finalized, _pending_count = is_season_finalized(sp)
     if finalized:
         print(
             "Error: Season is finalized (no pending games). "
@@ -227,19 +225,38 @@ def _blocks(value: int, scale: int) -> str:
     return "█" * max(0, value // scale)
 
 
+def _print_top_table(top: list[Standing], tw: int) -> None:
+    """Print the ranked top-teams table."""
+    print("\n" + "=" * 70)
+    print("  Top Teams — current table")
+    print("=" * 70)
+
+    hdr = f"{'#':>2}  {'Team':<{tw}}  {'GP':>2}  {'Pts':>3}  {'Diff':>5}"
+    print(hdr)
+    print("-" * len(hdr))
+    for i, s in enumerate(top, 1):
+        st = s.stats
+        diff_str = f"+{st.diff}" if st.diff > 0 else str(st.diff)
+        print(f"{i:>2}  {s.name:<{tw}}  {st.gp:>2}  {st.pts:>3}  {diff_str:>5}")
+
+
+def _print_points_chart(top: list[Standing], tw: int) -> None:
+    """Print the ASCII points bar chart for the top teams."""
+    pts_vals = [s.stats.pts for s in top]
+    max_pts = max(pts_vals) if pts_vals else 0
+    # Keep chart readable: 1 block per 1–2 points depending on scale.
+    scale = 1 if max_pts <= 20 else max(1, max_pts // 20)
+    print("\nStandings Points (scaled)")
+    print("─────────────────────────")
+    for s in top:
+        pts = s.stats.pts
+        print(f"{s.name:<{tw}}  {_blocks(pts, scale):<22}  {pts}")
+    print(f"(scale: 1 block ≈ {scale} pts)")
+
+
 def cmd_top(args: argparse.Namespace) -> None:
     """Handle 'top' subcommand."""
-
-    fp = args.results
-    if fp is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --results PATH or --ligaid LIGAID for top.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        fp = str(Path("files") / str(args.ligaid) / "ergebnisse.html")
-
+    fp = _resolve_results(args, "top")
     standings, league_info = calculate_standings(fp)
     top = standings[: args.n]
 
@@ -253,29 +270,8 @@ def cmd_top(args: argparse.Namespace) -> None:
         return
 
     tw = max(4, max(len(s.name) for s in top))
-    print("\n" + "=" * 70)
-    print("  Top Teams — current table")
-    print("=" * 70)
-
-    hdr = f"{'#':>2}  {'Team':<{tw}}  {'GP':>2}  {'Pts':>3}  {'Diff':>5}"
-    print(hdr)
-    print("-" * len(hdr))
-    for i, s in enumerate(top, 1):
-        st = s.stats
-        diff = st.diff
-        diff_str = f"+{diff}" if diff > 0 else str(diff)
-        print(f"{i:>2}  {s.name:<{tw}}  {st.gp:>2}  {st.pts:>3}  {diff_str:>5}")
-
-    pts_vals = [s.stats.pts for s in top]
-    max_pts = max(pts_vals) if pts_vals else 0
-    scale = 1 if max_pts <= 20 else max(1, max_pts // 20)
-    print("\nStandings Points (scaled)")
-    print("─────────────────────────")
-    for s in top:
-        st = s.stats
-        pts = st.pts
-        print(f"{s.name:<{tw}}  {_blocks(pts, scale):<22}  {pts}")
-    print(f"(scale: 1 block ≈ {scale} pts)")
+    _print_top_table(top, tw)
+    _print_points_chart(top, tw)
 
 
 _BASE = "https://www.basketball-bund.net/public"

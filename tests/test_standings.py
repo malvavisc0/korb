@@ -3,7 +3,7 @@
 from collections import defaultdict
 from datetime import datetime
 
-from korb.core import Game
+from korb.core import LOCAL_TZ, Game
 from korb.standings import TeamStats, _update_stats
 
 
@@ -54,7 +54,7 @@ class TestTeamStatsAvg:
 class TestUpdateStats:
     def _game(self, home_score: int, away_score: int) -> Game:
         return Game(
-            date=datetime(2026, 1, 15, 10, 0),
+            date=datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ),
             home="Team A",
             away="Team B",
             home_score=home_score,
@@ -120,6 +120,6 @@ class TestCalculateStandings:
     def test_returns_league_info(self, ergebnisse_path):
         from korb.standings import calculate_standings
 
-        standings, league_info = calculate_standings(ergebnisse_path)
+        _standings, league_info = calculate_standings(ergebnisse_path)
         assert league_info.name == "Test Bezirksliga"
         assert league_info.number == 99999

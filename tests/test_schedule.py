@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
+from korb.core import LOCAL_TZ
 from korb.schedule import (
     ScheduledGame,
     _HTMLScheduleParser,
@@ -75,7 +76,7 @@ class TestParseSchedule:
 
 class TestFilterSchedule:
     def _make_game(self, days_offset: int, cancelled: bool = False) -> ScheduledGame:
-        dt = datetime.now() + timedelta(days=days_offset)
+        dt = datetime.now(LOCAL_TZ) + timedelta(days=days_offset)
         return ScheduledGame(
             nr=1,
             day=1,
@@ -128,7 +129,7 @@ class TestIsSeasonFinalized:
         assert finalized is True
         assert count == 0
 
-    def test_not_finalized(self, spielplan_path):
+    def test_not_finalized(self, spielplan_path, frozen_now):
         finalized, count = is_season_finalized(spielplan_path)
         assert finalized is False
         assert count > 0
@@ -136,7 +137,7 @@ class TestIsSeasonFinalized:
 
 class TestMarkBackToBack:
     def test_b2b_detection(self):
-        base = datetime(2026, 1, 15, 10, 0)
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
         games = [
             ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", False),
             ScheduledGame(
@@ -156,7 +157,7 @@ class TestMarkBackToBack:
         assert b2b[1] is True
 
     def test_no_b2b(self):
-        base = datetime(2026, 1, 15, 10, 0)
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
         games = [
             ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", False),
             ScheduledGame(
@@ -173,7 +174,7 @@ class TestMarkBackToBack:
         assert all(v is False for v in b2b.values())
 
     def test_threshold_edge_case(self):
-        base = datetime(2026, 1, 15, 10, 0)
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
         # Exactly 36 hours later
         later = base + timedelta(hours=36)
         games = [

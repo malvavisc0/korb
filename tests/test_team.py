@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from korb.core import Game
+from korb.core import LOCAL_TZ, Game
 from korb.team import (
     GameResult,
     _game_to_result,
@@ -42,7 +42,7 @@ class TestResultCode:
 class TestGameToResult:
     def _game(self, home_score: int, away_score: int) -> Game:
         return Game(
-            date=datetime(2026, 1, 15, 10, 0),
+            date=datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ),
             home="Team A",
             away="Team B",
             home_score=home_score,
@@ -51,7 +51,7 @@ class TestGameToResult:
 
     def test_home_perspective_win(self):
         r = _game_to_result(self._game(80, 70), is_home=True)
-        assert r.date == datetime(2026, 1, 15, 10, 0)
+        assert r.date == datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
         assert r.opponent == "Team B"
         assert r.home_away == "Home"
         assert r.our_score == 80
@@ -60,7 +60,7 @@ class TestGameToResult:
 
     def test_away_perspective_loss(self):
         r = _game_to_result(self._game(80, 70), is_home=False)
-        assert r.date == datetime(2026, 1, 15, 10, 0)
+        assert r.date == datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
         assert r.opponent == "Team A"
         assert r.home_away == "Away"
         assert r.our_score == 70
