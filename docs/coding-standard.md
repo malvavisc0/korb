@@ -23,7 +23,8 @@ into `files/<ligaid>/`.
 - Dev dependencies: pytest, pytest-cov, ruff, basedpyright
 - CLI: argparse subcommands in `korb/__main__.py`, entry point
   `korb = "korb.__main__:main"`
-- Type checker: **basedpyright** (no pyproject section yet; defaults)
+- Type checker: **basedpyright** (configured in pyproject; CLI-boundary
+  `Any` and style diagnostics disabled)
 - Lint/format: **ruff** (line-length 88, target py310 — the minimum
   supported Python)
 - Complexity: **radon** (ad hoc via `uvx`)

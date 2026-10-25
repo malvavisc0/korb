@@ -69,3 +69,9 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["korb"]
+
+[tool.basedpyright]
+reportAny = "none"
+reportImplicitOverride = "none"
+reportImplicitStringConcatenation = "none"
+reportUnusedCallResult = "none"
