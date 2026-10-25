@@ -1,7 +1,7 @@
 """Game results viewer for DBB (Deutscher Basketball Bund) data.
 
 Displays all completed game results for a league with optional team filter.
-Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
+Target: DBB Version ≤12.01.1-f733da5 (legacy JSP platform).
 """
 
 from korb.core import Game, normalize_name, print_header

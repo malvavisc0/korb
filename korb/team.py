@@ -2,7 +2,7 @@
 
 Displays all game results for a specific team with scores,
 differentials, and win/loss/draw summary.
-Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
+Target: DBB Version ≤12.01.1-f733da5 (legacy JSP platform).
 """
 
 from dataclasses import dataclass

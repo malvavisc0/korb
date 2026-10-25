@@ -29,6 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - `print_metrics()` no longer takes a league name (breaking API change).
 - Type annotations added to parser state attributes; ruff targets the
   Python 3.10 floor.
+- Updated the supported DBB target to `12.01.1-f733da5`.
 
 ### Removed
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Basketball league CLI for DBB (Deutscher Basketball Bund) data.
 
-Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
+Target: DBB Version ≤12.01.1-f733da5 (legacy JSP platform).
 """
 
 import argparse

@@ -10,7 +10,7 @@ tool use. Answer the question; move on.
 korb — a zero-runtime-dependency Python CLI for DBB (Deutscher
 Basketball Bund) basketball league analysis. It parses HTML from the
 legacy JSP platform at basketball-bund.net (target: DBB Version
-≤11.50.1-2f7f327) and exposes standings, results, schedules,
+≤12.01.1-f733da5) and exposes standings, results, schedules,
 predictions, and team metrics. An argparse CLI (`korb/__main__.py`)
 dispatches subcommands; `korb/download.py` fetches fresh league HTML
 into `files/<ligaid>/`.
