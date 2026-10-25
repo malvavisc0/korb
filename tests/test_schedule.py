@@ -7,11 +7,13 @@ import pytest
 from korb.core import LOCAL_TZ
 from korb.schedule import (
     ScheduledGame,
+    _b2b_flags,
     _HTMLScheduleParser,
     filter_schedule,
     is_season_finalized,
     mark_back_to_back,
     parse_schedule,
+    print_schedule,
 )
 
 
@@ -46,9 +48,18 @@ class TestHTMLScheduleParser:
         parser = _HTMLScheduleParser()
         parser.feed(
             "<tr><td>3</td><td>2</td><td>22.01.2026 15:00</td>"
+            "<td>Team B</td><td>Team A</td>"
+            '<td>Halle B<img title="Spiel abgesagt"></td></tr>'
+        )
+        assert len(parser.games) == 1
+        assert parser.games[0].cancelled
+
+    def test_normal_row_not_cancelled(self):
+        parser = _HTMLScheduleParser()
+        parser.feed(
+            "<tr><td>3</td><td>2</td><td>22.01.2026 15:00</td>"
             "<td>Team B</td><td>Team A</td><td>Halle B</td></tr>"
         )
-        # Without strike or img, not cancelled
         assert not parser.games[0].cancelled
 
     def test_incomplete_row_skipped(self):
@@ -184,3 +195,50 @@ class TestMarkBackToBack:
         b2b = mark_back_to_back(games, threshold_h=36)
         # 36h exactly → <= threshold → B2B
         assert b2b[1] is True
+
+
+class TestB2BFlags:
+    def test_pending_game_uses_completed_history(self):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        played = ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", False)
+        pending = ScheduledGame(
+            2,
+            1,
+            base + timedelta(hours=24),
+            "Team A",
+            "Team C",
+            "Halle",
+            False,
+        )
+        assert _b2b_flags([pending], [played, pending]) == {0: True}
+
+    def test_cancelled_games_do_not_count(self):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        cancelled = ScheduledGame(1, 1, base, "Team A", "Team B", "Halle", True)
+        pending = ScheduledGame(
+            2,
+            1,
+            base + timedelta(hours=24),
+            "Team A",
+            "Team C",
+            "Halle",
+            False,
+        )
+        assert _b2b_flags([pending], [cancelled, pending]) == {0: False}
+
+
+class TestPrintScheduleB2B:
+    def test_marker_does_not_shift_columns(self, capsys):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        games = [
+            ScheduledGame(1, 10, base, "Team A", "Team B", "Halle", False),
+            ScheduledGame(
+                2, 10, base.replace(hour=18), "Team A", "Team C", "Halle", False
+            ),
+        ]
+        print_schedule(games, "League", b2b=True)
+        lines = capsys.readouterr().out.splitlines()
+        header = next(line for line in lines if line.startswith("Nr."))
+        row = next(line for line in lines if line.startswith("2"))
+        assert "⚡" in row
+        assert row.index("15.01.26") == header.index("Datum")

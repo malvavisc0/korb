@@ -8,10 +8,20 @@ Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 
 from collections import defaultdict
 from math import exp, sqrt
+from typing import Literal
 
-from korb.core import Game, LeagueInfo, read_games
+from korb.core import Game, LeagueInfo, normalize_name, read_games
 from korb.schedule import ScheduledGame, filter_schedule, parse_schedule
-from korb.standings import Standing, TeamStats
+from korb.standings import (
+    Standing,
+    TeamStats,
+    print_standings_rows,
+    rank_standings,
+    record_game,
+)
+
+Winner = Literal["home", "away"]
+Prediction = tuple[ScheduledGame, Winner, int, int]
 
 # Recency half-life in days
 RECENCY_HALF_LIFE = 60.0
@@ -44,7 +54,7 @@ def _recency_weight(game: Game, ref_ts: float) -> float:
 def calc_strength(
     fp: str,
 ) -> tuple[dict[str, TeamStats], dict[str, tuple[float, float]], float]:
-    """Calculate team strength from completed games.
+    """Calculate team strength from completed games in a results file.
 
     Args:
         fp: HTML results file path.
@@ -56,30 +66,28 @@ def calc_strength(
             league_avg: league-wide weighted avg points per game
     """
     games, _ = read_games(fp)
+    return _calc_strength(games)
+
+
+def _calc_strength(
+    games: list[Game],
+) -> tuple[dict[str, TeamStats], dict[str, tuple[float, float]], float]:
+    """Calculate team strength from completed games."""
     if not games:
         return {}, {}, 50.0
 
     ref_ts = max(g.date.timestamp() for g in games)
 
-    # Unweighted stats for win / loss record
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
     for game in games:
-        h, a = teams[game.home], teams[game.away]
-        h.gp += 1
-        a.gp += 1
-        h.pf += game.home_score
-        h.pa += game.away_score
-        a.pf += game.away_score
-        a.pa += game.home_score
-        if game.home_score > game.away_score:
-            h.w += 1
-            a.l += 1
-        elif game.home_score < game.away_score:
-            a.w += 1
-            h.l += 1
-        else:
-            h.d += 1
-            a.d += 1
+        record_game(
+            teams,
+            game.home,
+            game.away,
+            game.home_score,
+            game.away_score,
+            forfeit=game.forfeit,
+        )
 
     w_pf: dict[str, float] = defaultdict(float)
     w_pa: dict[str, float] = defaultdict(float)
@@ -196,7 +204,7 @@ def predict_game(
     league_avg: float,
     home_fatigue: float = 1.0,
     away_fatigue: float = 1.0,
-) -> tuple[str, int, int]:
+) -> tuple[Winner, int, int]:
     """Predict game outcome using multiplicative efficiency model.
 
     Home advantage is applied symmetrically (zero-sum):
@@ -248,18 +256,29 @@ def _copy_stats(teams_base: dict[str, TeamStats]) -> dict[str, TeamStats]:
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
     for name, st in teams_base.items():
         t = teams[name]
-        t.gp, t.w, t.l, t.d, t.pf, t.pa = st.gp, st.w, st.l, st.d, st.pf, st.pa
+        t.gp, t.w, t.l, t.d = st.gp, st.w, st.l, st.d
+        t.pf, t.pa, t.penalty = st.pf, st.pa, st.penalty
     return teams
 
 
 def _pending_games(html_path: str, played: list[Game]) -> list[ScheduledGame]:
-    """Return future scheduled games not already present in results."""
-    played_keys = {(g.home, g.away, g.date.strftime("%d.%m.%Y")) for g in played}
+    """Return scheduled games not already present in results."""
+    played_numbers = {g.nr for g in played if g.nr is not None}
+    played_keys = {
+        (normalize_name(g.home), normalize_name(g.away), g.date.strftime("%d.%m.%Y"))
+        for g in played
+    }
     schedule, _ = parse_schedule(html_path)
     pending = [
         g
-        for g in filter_schedule(schedule, pending=True)
-        if (g.home, g.away, g.date.strftime("%d.%m.%Y")) not in played_keys
+        for g in filter_schedule(schedule)
+        if g.nr not in played_numbers
+        and (
+            normalize_name(g.home),
+            normalize_name(g.away),
+            g.date.strftime("%d.%m.%Y"),
+        )
+        not in played_keys
     ]
     pending.sort(key=lambda g: g.date)
     return pending
@@ -285,31 +304,10 @@ def _fatigue(
     return 1.0
 
 
-def _apply_result(
-    home: TeamStats, away: TeamStats, winner: str, hs: int, as_: int
-) -> None:
-    """Update both teams' stats with a predicted game result."""
-    home.gp += 1
-    away.gp += 1
-    home.pf += hs
-    home.pa += as_
-    away.pf += as_
-    away.pa += hs
-    if winner == "home":
-        home.w += 1
-        away.l += 1
-    elif winner == "away":
-        away.w += 1
-        home.l += 1
-    else:
-        home.d += 1
-        away.d += 1
-
-
 def predict_standings(
     results_path: str,
     html_path: str,
-) -> tuple[list[Standing], list[tuple[ScheduledGame, str, int, int]], LeagueInfo]:
+) -> tuple[list[Standing], list[Prediction], LeagueInfo]:
     """Predict final standings based on remaining games.
 
     Completed games (from results file) are cross-referenced against
@@ -325,16 +323,15 @@ def predict_standings(
         (game, winner, home_score, away_score) tuples, and league_info
         contains league metadata.
     """
-    teams_base, ratings, league_avg = calc_strength(results_path)
-    teams = _copy_stats(teams_base)
-
     played, league_info = read_games(results_path)
+    teams_base, ratings, league_avg = _calc_strength(played)
+    teams = _copy_stats(teams_base)
     pending = _pending_games(html_path, played)
 
     last_game_ts = _last_game_times(played)
     threshold_s = FATIGUE_THRESHOLD_H * 3600
 
-    preds: list[tuple[ScheduledGame, str, int, int]] = []
+    preds: list[Prediction] = []
     for game in pending:
         gt = game.date.timestamp()
         h_fat = _fatigue(game.home, gt, last_game_ts, threshold_s)
@@ -352,17 +349,25 @@ def predict_standings(
         last_game_ts[game.home] = gt
         last_game_ts[game.away] = gt
         preds.append((game, winner, hs, as_))
-        _apply_result(teams[game.home], teams[game.away], winner, hs, as_)
+        record_game(teams, game.home, game.away, hs, as_, forfeit=False)
 
     standings = [Standing(n, s) for n, s in teams.items()]
-    standings.sort(
-        key=lambda s: (-s.stats.pts, -s.stats.diff, -s.stats.pf),
-    )
-    return standings, preds, league_info
+    rank_games = list(played) + [
+        Game(
+            nr=game.nr,
+            date=game.date,
+            home=game.home,
+            away=game.away,
+            home_score=hs,
+            away_score=as_,
+        )
+        for game, _, hs, as_ in preds
+    ]
+    return rank_standings(standings, rank_games), preds, league_info
 
 
 def print_predictions(
-    preds: list[tuple[ScheduledGame, str, int, int]],
+    preds: list[Prediction],
 ) -> None:
     """Print predicted game outcomes.
 
@@ -383,12 +388,7 @@ def print_predictions(
 
     for game, winner, hs, as_ in sorted_preds:
         date_str = game.date.strftime("%d.%m.%y %H:%M")
-        if winner == "home":
-            tag = f"<- {game.home}"
-        elif winner == "away":
-            tag = f"-> {game.away}"
-        else:
-            tag = "== Draw"
+        tag = f"<- {game.home}" if winner == "home" else f"-> {game.away}"
         print(
             f"  {date_str}  {game.home:<{hw}}  "
             f"{hs:>3} : {as_:<3}  "
@@ -410,25 +410,5 @@ def print_predicted_standings(standings: list[Standing]) -> None:
         print("No predictions.")
         return
 
-    tw = max(4, max(len(s.name) for s in standings))
-    hdr = (
-        f"{'#':>2}  {'Team':<{tw}}  "
-        f"{'GP':>3} {'W':>3} {'L':>3} {'D':>3}  "
-        f"{'PF':>5} {'PA':>5} {'Diff':>6} {'Pts':>4}  "
-        f"{'Avg PF':>7} {'Avg PA':>7}"
-    )
-    print(hdr)
-    print("-" * len(hdr))
-
-    for i, s in enumerate(standings, 1):
-        d = s.stats.diff
-        diff_str = f"+{d}" if d > 0 else str(d)
-        print(
-            f"{i:>2}  {s.name:<{tw}}  "
-            f"{s.stats.gp:>3} {s.stats.w:>3} "
-            f"{s.stats.l:>3} {s.stats.d:>3}  "
-            f"{s.stats.pf:>5} {s.stats.pa:>5} "
-            f"{diff_str:>6} {s.stats.pts:>4}  "
-            f"{s.stats.avg_pf:>7.1f} {s.stats.avg_pa:>7.1f}"
-        )
+    print_standings_rows(standings)
     print()

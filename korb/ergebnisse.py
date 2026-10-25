@@ -4,7 +4,7 @@ Displays all completed game results for a league with optional team filter.
 Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
-from korb.core import Game, print_header
+from korb.core import Game, normalize_name, print_header
 
 
 def filter_ergebnisse(games: list[Game], team: str | None = None) -> list[Game]:
@@ -19,8 +19,10 @@ def filter_ergebnisse(games: list[Game], team: str | None = None) -> list[Game]:
     """
     if not team:
         return games
-    t = team.lower()
-    return [g for g in games if t in g.home.lower() or t in g.away.lower()]
+    t = normalize_name(team)
+    return [
+        g for g in games if t in normalize_name(g.home) or t in normalize_name(g.away)
+    ]
 
 
 def print_ergebnisse(

@@ -6,6 +6,7 @@ from korb.core import LOCAL_TZ, Game
 from korb.predict import (
     _build_ratings,
     _calc_form_totals,
+    _pending_games,
     _recency_weight,
     calc_strength,
     predict_game,
@@ -188,3 +189,35 @@ class TestPredictStandings:
         assert len(preds) == 0
         # Standings should still reflect completed games
         assert len(standings) > 0
+
+
+class TestPendingGames:
+    def test_past_unplayed_game_is_pending(self, tmp_path):
+        path = tmp_path / "spielplan.html"
+        path.write_text(
+            "<html><head><title>Spielplan - Test (x)</title></head><body>"
+            "<table><tr><td>1</td><td>1</td><td>01.01.2020 10:00</td>"
+            "<td>Team A</td><td>Team B</td><td>Halle</td></tr></table>"
+            "</body></html>"
+        )
+        assert len(_pending_games(str(path), [])) == 1
+
+    def test_played_fixture_excluded_by_number(self, tmp_path, frozen_now):
+        path = tmp_path / "spielplan.html"
+        path.write_text(
+            "<html><head><title>Spielplan - Test (x)</title></head><body>"
+            "<table><tr><td>1</td><td>1</td><td>20.01.2026 10:00</td>"
+            "<td>Team A</td><td>Team B</td><td>Halle</td></tr></table>"
+            "</body></html>"
+        )
+        played = [
+            Game(
+                nr=1,
+                date=datetime(2025, 12, 20, 10, 0, tzinfo=LOCAL_TZ),
+                home="Team A",
+                away="Team B",
+                home_score=80,
+                away_score=70,
+            )
+        ]
+        assert _pending_games(str(path), played) == []

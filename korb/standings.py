@@ -6,9 +6,10 @@ Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 
 from collections import defaultdict
 from dataclasses import dataclass
+from itertools import groupby
 from typing import Final
 
-from korb.core import Game, LeagueInfo, print_header, read_games
+from korb.core import Game, LeagueInfo, is_forfeit_score, print_header, read_games
 
 WIN_PTS: Final[int] = 2
 LOSS_PTS: Final[int] = 0
@@ -25,6 +26,7 @@ class TeamStats:
     d: int = 0
     pf: int = 0
     pa: int = 0
+    penalty: int = 0
 
     @property
     def diff(self) -> int:
@@ -33,8 +35,8 @@ class TeamStats:
 
     @property
     def pts(self) -> int:
-        """Total standings points (2 per win, 1 per draw)."""
-        return self.w * WIN_PTS + self.l * LOSS_PTS + self.d * DRAW_PTS
+        """Total standings points (2 per win, 1 per draw, minus forfeits)."""
+        return self.w * WIN_PTS + self.l * LOSS_PTS + self.d * DRAW_PTS + self.penalty
 
     @property
     def avg_pf(self) -> float:
@@ -55,6 +57,7 @@ class TeamStats:
             "d": self.d,
             "pf": self.pf,
             "pa": self.pa,
+            "penalty": self.penalty,
             "diff": self.diff,
             "pts": self.pts,
             "avg_pf": round(self.avg_pf, 1),
@@ -74,6 +77,108 @@ class Standing:
         return {"name": self.name, **self.stats.to_dict()}
 
 
+def record_game(
+    teams: dict[str, TeamStats],
+    home: str,
+    away: str,
+    home_score: int,
+    away_score: int,
+    *,
+    forfeit: bool | None = None,
+) -> None:
+    """Update team stats from a completed or predicted game.
+
+    A DBB forfeit gives the winner 2 points and deducts 1 from the loser.
+
+    Args:
+        teams: Dict mapping team names to their stats.
+        home: Home team name.
+        away: Away team name.
+        home_score: Home team score.
+        away_score: Away team score.
+        forfeit: True if the game was decided as a forfeit; None
+            auto-detects a 20:0 or 0:20 result.
+    """
+    if forfeit is None:
+        forfeit = is_forfeit_score(home_score, away_score)
+    home_stats = teams.setdefault(home, TeamStats())
+    away_stats = teams.setdefault(away, TeamStats())
+
+    home_stats.gp += 1
+    home_stats.pf += home_score
+    home_stats.pa += away_score
+
+    away_stats.gp += 1
+    away_stats.pf += away_score
+    away_stats.pa += home_score
+
+    if home_score > away_score:
+        home_stats.w += 1
+        away_stats.l += 1
+        if forfeit:
+            away_stats.penalty -= 1
+    elif home_score < away_score:
+        away_stats.w += 1
+        home_stats.l += 1
+        if forfeit:
+            home_stats.penalty -= 1
+    else:
+        home_stats.d += 1
+        away_stats.d += 1
+
+
+def _head_to_head(
+    games: list[Game], names: set[str]
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Return points and differential from games between ``names``."""
+    stats = {name: TeamStats() for name in names}
+    for game in games:
+        if game.home in stats and game.away in stats:
+            record_game(
+                stats,
+                game.home,
+                game.away,
+                game.home_score,
+                game.away_score,
+                forfeit=game.forfeit,
+            )
+    return (
+        {name: stat.pts for name, stat in stats.items()},
+        {name: stat.diff for name, stat in stats.items()},
+    )
+
+
+def _points_split(stats: TeamStats) -> int:
+    """Apply DBB's points criterion after overall differential."""
+    return stats.pa if stats.diff > 0 else -stats.pf
+
+
+def rank_standings(standings: list[Standing], games: list[Game]) -> list[Standing]:
+    """Rank standings using DBB placement rules.
+
+    Teams are ordered by points, fewer games, head-to-head points,
+    head-to-head differential, overall differential, then the DBB
+    points-scored/allowed criterion.
+    """
+    ordered = sorted(standings, key=lambda s: (-s.stats.pts, s.stats.gp))
+    ranked: list[Standing] = []
+    for _, group in groupby(ordered, key=lambda s: (s.stats.pts, s.stats.gp)):
+        tied = list(group)
+        if len(tied) > 1:
+            h2h_pts, h2h_diff = _head_to_head(games, {s.name for s in tied})
+            tied.sort(
+                key=lambda s: (
+                    -h2h_pts[s.name],
+                    -h2h_diff[s.name],
+                    -s.stats.diff,
+                    _points_split(s.stats),
+                    s.name,
+                )
+            )
+        ranked.extend(tied)
+    return ranked
+
+
 def calculate_standings(filepath: str) -> tuple[list[Standing], LeagueInfo]:
     """Calculate league standings from game results.
 
@@ -81,62 +186,28 @@ def calculate_standings(filepath: str) -> tuple[list[Standing], LeagueInfo]:
         filepath: HTML results file path.
 
     Returns:
-        Tuple of (standings sorted by pts/diff/pf, league_info).
+        Tuple of (standings in DBB placement order, league_info).
     """
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
     games, league_info = read_games(filepath)
 
     for game in games:
-        _update_stats(teams, game)
+        record_game(
+            teams,
+            game.home,
+            game.away,
+            game.home_score,
+            game.away_score,
+            forfeit=game.forfeit,
+        )
 
     standings = [Standing(name, stats) for name, stats in teams.items()]
-    standings.sort(key=lambda s: (-s.stats.pts, -s.stats.diff, -s.stats.pf))
-    return standings, league_info
+    return rank_standings(standings, games), league_info
 
 
-def _update_stats(teams: dict[str, TeamStats], game: Game) -> None:
-    """Update team stats from a single game.
-
-    Args:
-        teams: Dict mapping team names to their stats.
-        game: Completed game to process.
-    """
-    home = teams[game.home]
-    away = teams[game.away]
-
-    home.gp += 1
-    home.pf += game.home_score
-    home.pa += game.away_score
-
-    away.gp += 1
-    away.pf += game.away_score
-    away.pa += game.home_score
-
-    if game.home_score > game.away_score:
-        home.w += 1
-        away.l += 1
-    elif game.home_score < game.away_score:
-        away.w += 1
-        home.l += 1
-    else:
-        home.d += 1
-        away.d += 1
-
-
-def print_table(
-    standings: list[Standing],
-    league_name: str = "Basketball League",
-) -> None:
-    """Print formatted standings table.
-
-    Args:
-        standings: List of Standing objects to display.
-        league_name: League name for header.
-    """
-    print_header("Standings", league_name)
-
+def print_standings_rows(standings: list[Standing]) -> None:
+    """Print the standings column headers and rows."""
     if not standings:
-        print("No standings data.")
         return
 
     tw = max(4, max(len(s.name) for s in standings))
@@ -161,4 +232,22 @@ def print_table(
             f"{s.stats.avg_pf:>7.1f} {s.stats.avg_pa:>7.1f}"
         )
 
+
+def print_table(
+    standings: list[Standing],
+    league_name: str = "Basketball League",
+) -> None:
+    """Print formatted standings table.
+
+    Args:
+        standings: List of Standing objects to display.
+        league_name: League name for header.
+    """
+    print_header("Standings", league_name)
+
+    if not standings:
+        print("No standings data.")
+        return
+
+    print_standings_rows(standings)
     print()

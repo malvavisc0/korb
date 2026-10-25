@@ -24,7 +24,7 @@ platform and provides standings, results, schedules, predictions, and more.
 - 🔮 **Predict** — efficiency-model-based final standings forecast
 - 🥇 **Top** — quick leaderboard with ASCII bar chart
 - 📥 **Download** — fetch fresh HTML data directly from basketball-bund.net
-- 🔧 **`--json`** — machine-readable output for all commands
+- 🔧 **`--json`** — machine-readable output for data commands (not `download`)
 
 ## Installation
 
@@ -33,7 +33,7 @@ platform and provides standings, results, schedules, predictions, and more.
 git clone https://github.com/malvavisc0/korb && cd korb
 uv sync
 
-# With pip
+# With pip (end-user install)
 pip install .
 ```
 
@@ -144,8 +144,9 @@ The `predict` command estimates final standings using a **multiplicative efficie
 ```
 korb/
 ├── __init__.py      # Package marker & version
-├── __main__.py      # CLI entry point & download command
+├── __main__.py      # CLI entry point & command handlers
 ├── core.py          # Shared models, HTML parsing, utilities
+├── download.py      # HTTP downloader, headers, rate limiting
 ├── ergebnisse.py    # Game results viewer & filter
 ├── predict.py       # Multiplicative efficiency prediction model
 ├── schedule.py      # HTML schedule parser & filters
@@ -165,13 +166,17 @@ korb/
 # Install with dev tools
 uv sync --group dev
 
-# Lint & format
+# Lint, format & type-check
 uv run ruff check korb/ tests/
 uv run ruff format korb/ tests/
+uv run basedpyright korb
 
 # Run tests
 uv run pytest
 ```
+
+Project conventions are documented in
+[`docs/coding-standard.md`](docs/coding-standard.md).
 
 ## License
 

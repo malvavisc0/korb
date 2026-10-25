@@ -21,6 +21,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = []
 
@@ -42,13 +43,6 @@ path = "korb/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["korb"]
 
-# Syncing Hatch env with your dependency groups
-[tool.hatch.envs.default]
-extra-dependencies = [
-    "ipython",
-]
-features = ["dev"] 
-
 [dependency-groups]
 dev = [
     "pytest",
@@ -64,11 +58,11 @@ addopts = "-v --cov=korb --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["korb"]
-omit = ["tests/*", "*/__main__.py"]
+omit = ["tests/*"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]

@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from datetime import datetime
 from statistics import pstdev
 
-from korb.core import DATE_FMT, Game, LeagueInfo, print_header, read_games
+from korb.core import (
+    DATE_FMT,
+    Game,
+    LeagueInfo,
+    normalize_name,
+    print_header,
+    read_games,
+)
 
 
 @dataclass
@@ -101,12 +108,14 @@ def get_team_results(
     """
     games, league_info = read_games(filepath)
     results: list[GameResult] = []
-    name_lower = team_name.lower()
+    name_lower = normalize_name(team_name)
+    if not name_lower:
+        return results, league_info
 
     for game in games:
-        if name_lower in game.home.lower():
+        if name_lower in normalize_name(game.home):
             results.append(_game_to_result(game, is_home=True))
-        elif name_lower in game.away.lower():
+        elif name_lower in normalize_name(game.away):
             results.append(_game_to_result(game, is_home=False))
 
     return results, league_info
@@ -347,7 +356,6 @@ def _recent_record(results: list[GameResult]) -> tuple[str, int]:
 
 def print_metrics(
     results: list[GameResult],
-    league_name: str = "Basketball League",
     last_k: int | None = None,
 ) -> None:
     """Print computed metrics for the (optionally filtered) result list."""

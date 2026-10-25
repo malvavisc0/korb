@@ -31,6 +31,11 @@ def ergebnisse_path() -> str:
 
 
 @pytest.fixture
+def ergebnisse_nested_path() -> str:
+    return str(FIXTURES_DIR / "ergebnisse_nested.html")
+
+
+@pytest.fixture
 def spielplan_path() -> str:
     return str(FIXTURES_DIR / "spielplan_minimal.html")
 

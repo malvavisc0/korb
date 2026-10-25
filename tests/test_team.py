@@ -9,6 +9,8 @@ from korb.team import (
     _result_code,
     _sparkline_char,
     get_team_results,
+    print_bars,
+    print_metrics,
     print_results,
 )
 
@@ -88,6 +90,22 @@ class TestGetTeamResults:
         results, _ = get_team_results("NonExistent", ergebnisse_path)
         assert results == []
 
+    def test_empty_name_returns_no_results(self, ergebnisse_path):
+        results, _ = get_team_results("", ergebnisse_path)
+        assert results == []
+
+    def test_internal_double_spaces_are_normalized(self, tmp_path):
+        path = tmp_path / "ergebnisse.html"
+        path.write_text(
+            "<html><head><title>Ergebnisse - Test (x)</title></head><body>"
+            "<table><tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team  Alpha</td><td>Team Beta</td><td>79 : 75</td></tr>"
+            "</table></body></html>"
+        )
+        results, _ = get_team_results("Team Alpha", str(path))
+        assert len(results) == 1
+        assert results[0].home_away == "Home"
+
 
 class TestSparklineChar:
     def test_win(self):
@@ -131,3 +149,46 @@ class TestPrintResultsOrder:
         assert out.index("Oldest") < out.index("Middle") < out.index("Newest")
         # Sparkline reads oldest->newest: Draw, Loss, Win.
         assert "─▄█" in out
+
+
+class TestPrintBars:
+    def test_prints_chart(self, capsys):
+        results = [
+            GameResult(datetime(2026, 3, 1, 10, 0), "B", "Home", 90, 80, "W"),
+            GameResult(datetime(2026, 2, 1, 10, 0), "C", "Away", 60, 70, "L"),
+        ]
+        print_bars(results)
+        out = capsys.readouterr().out
+        assert "└" in out
+        assert "1 2" in out
+
+    def test_empty_is_noop(self, capsys):
+        print_bars([])
+        assert capsys.readouterr().out == ""
+
+
+class TestPrintMetrics:
+    def test_prints_metrics(self, capsys):
+        results = [
+            GameResult(datetime(2026, 3, 1, 10, 0), "B", "Home", 90, 80, "W"),
+            GameResult(datetime(2026, 2, 1, 10, 0), "C", "Away", 60, 70, "L"),
+            GameResult(datetime(2026, 1, 1, 10, 0), "D", "Home", 75, 75, "D"),
+        ]
+        print_metrics(results)
+        out = capsys.readouterr().out
+        assert "Metrics (quality profile)" in out
+        assert "Win rate:" in out
+        assert "Volatility" in out
+
+    def test_last_k(self, capsys):
+        results = [
+            GameResult(datetime(2026, 3, 1, 10, 0), "B", "Home", 90, 80, "W"),
+            GameResult(datetime(2026, 2, 1, 10, 0), "C", "Away", 60, 70, "L"),
+        ]
+        print_metrics(results, last_k=1)
+        out = capsys.readouterr().out
+        assert "most recent 1 games" in out
+
+    def test_empty(self, capsys):
+        print_metrics([])
+        assert "no games to analyze" in capsys.readouterr().out

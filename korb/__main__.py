@@ -5,27 +5,16 @@ Target: DBB Version ≤11.50.1-2f7f327 (legacy JSP platform).
 """
 
 import argparse
-import gzip
-import http.client
 import json
-import random
 import sys
-import time
-import urllib.error
-import urllib.request
-import zlib
 from pathlib import Path
 
 from . import __version__
 from .core import LeagueInfo, read_games
+from .download import discover_league_ids, download_league, wait_between_requests
 from .ergebnisse import filter_ergebnisse, print_ergebnisse
 from .predict import predict_standings, print_predicted_standings, print_predictions
-from .schedule import (
-    filter_schedule,
-    is_season_finalized,
-    parse_schedule,
-    print_schedule,
-)
+from .schedule import filter_schedule, parse_schedule, print_schedule
 from .standings import Standing, calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
 
@@ -86,6 +75,14 @@ def _resolve_schedule(args: argparse.Namespace, label: str) -> str:
     )
 
 
+def _positive_int(value: str) -> int:
+    """Parse a CLI integer that must be at least 1."""
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return number
+
+
 def cmd_standings(args: argparse.Namespace) -> None:
     """Handle 'standings' subcommand."""
     fp = _resolve_results(args, "standings")
@@ -121,7 +118,7 @@ def cmd_team(args: argparse.Namespace) -> None:
         print_bars(results)
     if args.metrics or args.last_k:
         print()
-        print_metrics(results, league_info.name, last_k=args.last_k)
+        print_metrics(results, last_k=args.last_k)
 
 
 def cmd_ergebnisse(args: argparse.Namespace) -> None:
@@ -129,8 +126,8 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
     fp = _resolve_results(args, "ergebnisse")
     games, league_info = read_games(fp)
     filtered = filter_ergebnisse(games, team=args.team)
-    filtered.sort(key=lambda g: g.date)
     if args.json:
+        ordered = sorted(filtered, key=lambda g: g.date)
         _json_out(
             {
                 **_liga_meta(league_info, args.ligaid),
@@ -142,7 +139,7 @@ def cmd_ergebnisse(args: argparse.Namespace) -> None:
                         "home_score": g.home_score,
                         "away_score": g.away_score,
                     }
-                    for g in filtered
+                    for g in ordered
                 ],
             }
         )
@@ -165,36 +162,22 @@ def cmd_schedule(args: argparse.Namespace) -> None:
             }
         )
     else:
-        print_schedule(filtered, league_info.name, b2b=args.b2b)
+        print_schedule(filtered, league_info.name, b2b=args.b2b, reference=games)
 
 
 def cmd_predict(args: argparse.Namespace) -> None:
     """Handle 'predict' subcommand."""
-    rp = args.results
-    sp = args.schedule
-    if rp is None or sp is None:
-        if args.ligaid is None:
-            print(
-                "Error: pass --results PATH and --schedule PATH, "
-                "or provide --ligaid LIGAID.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-        base = Path("files") / str(args.ligaid)
-        rp = rp or str(base / "ergebnisse.html")
-        sp = sp or str(base / "spielplan.html")
+    rp = _resolve_results(args, "prediction results")
+    sp = _resolve_schedule(args, "prediction schedule")
 
-    # Check if season is finalized
-    finalized, _pending_count = is_season_finalized(sp)
-    if finalized:
+    standings, preds, league_info = predict_standings(rp, sp)
+    if not preds:
         print(
             "Error: Season is finalized (no pending games). "
             "Prediction is not available.",
             file=sys.stderr,
         )
         sys.exit(1)
-
-    standings, preds, league_info = predict_standings(rp, sp)
     if args.json:
         _json_out(
             {
@@ -218,8 +201,6 @@ def cmd_predict(args: argparse.Namespace) -> None:
 
 
 def _blocks(value: int, scale: int) -> str:
-    if scale <= 0:
-        scale = 1
     return "█" * max(0, value // scale)
 
 
@@ -267,140 +248,28 @@ def cmd_top(args: argparse.Namespace) -> None:
         )
         return
 
+    if not top:
+        print("No standings data.")
+        return
+
     tw = max(4, max(len(s.name) for s in top))
     _print_top_table(top, tw)
     _print_points_chart(top, tw)
 
 
-_BASE = "https://www.basketball-bund.net/public"
-_RESULTS_URL = (
-    f"{_BASE}/ergebnisse.jsp?print=1"
-    "&viewDescKey=sport.dbb.liga.ErgebnisseViewPublic"
-    "/index.jsp_&liga_id={liga_id}"
-)
-_SCHEDULE_URL = (
-    f"{_BASE}/spielplan_list.jsp?print=1"
-    "&viewDescKey=sport.dbb.liga.SpielplanViewPublic"
-    "/index.jsp_&liga_id={liga_id}"
-)
-
-
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
-    ),
-    "Accept": (
-        "text/html,application/xhtml+xml,application/xml;"
-        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-    ),
-    "Accept-Language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Sec-CH-UA": '"Chromium";v="131", "Not_A Brand";v="24"',
-    "Sec-CH-UA-Mobile": "?0",
-    "Sec-CH-UA-Platform": '"Windows"',
-    "DNT": "1",
-    "Referer": "https://www.basketball-bund.net/",
-}
-
-# Minimum / maximum pause (seconds) between consecutive HTTP requests
-# to avoid triggering rate-limiters.
-_DELAY_MIN = 1.0
-_DELAY_MAX = 3.0
-
-
-def _read_response(resp: http.client.HTTPResponse) -> bytes:
-    """Read and decompress an HTTP response body.
-
-    Handles ``gzip`` and ``deflate`` Content-Encoding transparently so
-    the caller always receives raw bytes.
-    """
-    raw = resp.read()
-    encoding = resp.headers.get("Content-Encoding", "").strip().lower()
-    if encoding == "gzip":
-        return gzip.decompress(raw)
-    if encoding == "deflate":
-        # deflate may be raw-deflate or zlib-wrapped; try both.
-        try:
-            return zlib.decompress(raw)
-        except zlib.error:
-            return zlib.decompress(raw, -zlib.MAX_WBITS)
-    return raw
-
-
-def _download(ligaid: int) -> None:
-    """Download results & schedule HTML for a league.
-
-    Args:
-        ligaid: Liga ID on basketball-bund.net.
-    """
-    out_root = Path("files")
-    out_root.mkdir(exist_ok=True)
-    out = out_root / str(ligaid)
-    out.mkdir(exist_ok=True)
-    targets = [
-        (_RESULTS_URL.format(liga_id=ligaid), out / "ergebnisse.html"),
-        (_SCHEDULE_URL.format(liga_id=ligaid), out / "spielplan.html"),
-    ]
-    for i, (url, dest) in enumerate(targets):
-        if i > 0:
-            time.sleep(random.uniform(_DELAY_MIN, _DELAY_MAX))
-        print(
-            f"Downloading {dest.name} ...",
-            end=" ",
-            flush=True,
-        )
-        try:
-            req = urllib.request.Request(url, headers=_HEADERS)
-            with urllib.request.urlopen(req) as resp:
-                data = _read_response(resp)
-                with open(dest, "wb") as f:
-                    f.write(data)
-            print("OK")
-        except urllib.error.URLError as e:
-            print(f"FAILED: {e}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _discover_league_ids() -> list[int]:
-    """Scan the ``files/`` directory for previously downloaded league IDs.
-
-    Looks for subdirectories whose names are valid integers and that
-    contain at least one ``.html`` file.
-
-    Returns:
-        Sorted list of league IDs (int).
-    """
-    root = Path("files")
-    if not root.is_dir():
-        return []
-    ids: list[int] = []
-    for entry in sorted(root.iterdir()):
-        if entry.is_dir() and entry.name.isdigit() and any(entry.glob("*.html")):
-            ids.append(int(entry.name))
-    return ids
-
-
 def cmd_download(args: argparse.Namespace) -> None:
     """Handle 'download' subcommand."""
-    if getattr(args, "all", False) and args.ligaid is None:
-        ids = _discover_league_ids()
+    if args.all and args.ligaid is None:
+        ids = discover_league_ids()
         if not ids:
             print("No previously downloaded leagues found.", file=sys.stderr)
             sys.exit(1)
         print(f"Refreshing {len(ids)} league(s): {', '.join(str(i) for i in ids)}")
         for i, lid in enumerate(ids):
             if i > 0:
-                time.sleep(random.uniform(_DELAY_MIN, _DELAY_MAX))
+                wait_between_requests()
             print(f"\n--- Liga {lid} ---")
-            _download(lid)
+            download_league(lid)
         print("\nDone.")
         return
     if args.ligaid is None:
@@ -409,11 +278,11 @@ def cmd_download(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
         sys.exit(1)
-    _download(args.ligaid)
+    download_league(args.ligaid)
 
 
-def main() -> None:
-    """Entry point for CLI."""
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser."""
     parser = argparse.ArgumentParser(
         prog="korb", description="Basketball league analysis tools"
     )
@@ -475,7 +344,7 @@ def main() -> None:
     )
     p_tm.add_argument(
         "--last-k",
-        type=int,
+        type=_positive_int,
         default=None,
         help="Analyze only the most recent K games",
     )
@@ -537,7 +406,7 @@ def main() -> None:
     )
     p_top.add_argument(
         "-n",
-        type=int,
+        type=_positive_int,
         default=3,
         help="How many teams to show (default: 3)",
     )
@@ -555,7 +424,12 @@ def main() -> None:
     )
     p_dl.set_defaults(func=cmd_download)
 
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    """Entry point for CLI."""
+    args = _build_parser().parse_args()
 
     if args.download and args.command != "download":
         if args.ligaid is None:
@@ -564,7 +438,7 @@ def main() -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
-        _download(args.ligaid)
+        download_league(args.ligaid)
 
     args.func(args)
 

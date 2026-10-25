@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 DATE_FMT: Final[str] = "%d.%m.%Y %H:%M"
 # DBB schedule times are local German wall-clock times.
 LOCAL_TZ: Final[ZoneInfo] = ZoneInfo("Europe/Berlin")
+FORFEIT_SCORE: Final[int] = 20
 _LEAGUE_FALLBACK: Final[str] = "Basketball League"
 
 # Regex for league name in DBB HTML titles like:
@@ -47,6 +48,23 @@ class Game:
     away: str
     home_score: int
     away_score: int
+    nr: int | None = None
+    forfeit: bool = False
+
+
+def normalize_whitespace(value: str) -> str:
+    """Collapse whitespace runs into single spaces."""
+    return " ".join(value.split())
+
+
+def normalize_name(value: str) -> str:
+    """Normalize a team name for case-insensitive matching."""
+    return normalize_whitespace(value).lower()
+
+
+def is_forfeit_score(home_score: int, away_score: int) -> bool:
+    """Return True for DBB's 20:0 or 0:20 forfeit score."""
+    return (home_score, away_score) in ((FORFEIT_SCORE, 0), (0, FORFEIT_SCORE))
 
 
 def parse_date(date_str: str | None) -> datetime | None:
@@ -106,46 +124,77 @@ def read_file_safe(filepath: str) -> str:
         sys.exit(1)
 
 
-class _DBBRowParser(HTMLParser):
-    """Shared <td>/<tr>/<strike> row-scanning state machine for DBB HTML tables."""
+class DBBRowParser(HTMLParser):
+    """Shared table-row state machine for DBB HTML results and schedules."""
+
+    _in_td: bool
+    _td_depth: int
+    _tr_depth: int
+    _cells: list[str]
+    _current_cell: str
+    _row_cancelled: bool
 
     def __init__(self) -> None:
         super().__init__()
         self._in_td = False
         self._td_depth = 0
-        self._cells: list[str] = []
+        self._tr_depth = 0
+        self._reset_row()
+
+    def _reset_row(self) -> None:
+        self._cells = []
         self._current_cell = ""
         self._row_cancelled = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "td":
-            if self._td_depth == 0:
-                self._in_td = True
-                self._current_cell = ""
-            self._td_depth += 1
-        elif tag == "strike":
+        if tag == "tr":
+            self._start_row()
+        elif tag == "td":
+            self._start_cell()
+        elif tag == "strike" or self._is_cancelled_img(tag, attrs):
             self._row_cancelled = True
+
+    def _start_row(self) -> None:
+        if self._tr_depth and not self._in_td and self._td_depth == 0:
+            self._finalize_row()
+            self._tr_depth = 0
+        if self._tr_depth == 0:
+            self._reset_row()
+        self._tr_depth += 1
+
+    def _start_cell(self) -> None:
+        if self._td_depth == 0:
+            self._in_td = True
+            self._current_cell = ""
+        self._td_depth += 1
+
+    @staticmethod
+    def _is_cancelled_img(tag: str, attrs: list[tuple[str, str | None]]) -> bool:
+        return tag == "img" and any(
+            name == "title" and value == "Spiel abgesagt" for name, value in attrs
+        )
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "td":
-            self._td_depth -= 1
+            self._td_depth = max(0, self._td_depth - 1)
             if self._td_depth == 0:
-                self._cells.append(self._current_cell.strip())
+                self._cells.append(normalize_whitespace(self._current_cell))
                 self._in_td = False
         elif tag == "tr":
-            self._finalize_row()
-            self._cells = []
-            self._row_cancelled = False
+            self._tr_depth = max(0, self._tr_depth - 1)
+            if self._tr_depth == 0:
+                self._finalize_row()
+                self._reset_row()
 
     def handle_data(self, data: str) -> None:
-        if self._in_td and self._td_depth == 1:
+        if self._in_td:
             self._current_cell += data
 
     def _finalize_row(self) -> None:
         raise NotImplementedError
 
 
-class _HTMLResultsParser(_DBBRowParser):
+class _HTMLResultsParser(DBBRowParser):
     """Parse basketball-bund.net HTML results tables."""
 
     def __init__(self) -> None:
@@ -165,6 +214,7 @@ class _HTMLResultsParser(_DBBRowParser):
         date = parse_date(self._cells[2])
         if not date:
             return
+        nr_text = self._cells[0]
         self.games.append(
             Game(
                 date=date,
@@ -172,6 +222,8 @@ class _HTMLResultsParser(_DBBRowParser):
                 away=self._cells[4],
                 home_score=h_score,
                 away_score=a_score,
+                nr=int(nr_text) if nr_text.isdigit() else None,
+                forfeit=is_forfeit_score(h_score, a_score),
             )
         )
 
@@ -198,7 +250,7 @@ def extract_league_info(html: str) -> LeagueInfo:
 def read_games(filepath: str) -> tuple[list[Game], LeagueInfo]:
     """Read all valid games from HTML results file.
 
-    Skips forfeited games (struck-through rows) and incomplete rows.
+    Skips struck-through and incomplete rows.
 
     Args:
         filepath: Path to HTML results file.

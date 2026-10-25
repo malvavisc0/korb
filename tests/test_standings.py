@@ -4,7 +4,13 @@ from collections import defaultdict
 from datetime import datetime
 
 from korb.core import LOCAL_TZ, Game
-from korb.standings import TeamStats, _update_stats
+from korb.standings import (
+    Standing,
+    TeamStats,
+    calculate_standings,
+    rank_standings,
+    record_game,
+)
 
 
 class TestTeamStatsDiff:
@@ -51,19 +57,10 @@ class TestTeamStatsAvg:
         assert s.avg_pa == 70.0
 
 
-class TestUpdateStats:
-    def _game(self, home_score: int, away_score: int) -> Game:
-        return Game(
-            date=datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ),
-            home="Team A",
-            away="Team B",
-            home_score=home_score,
-            away_score=away_score,
-        )
-
+class TestRecordGame:
     def test_home_win(self):
         teams = defaultdict(TeamStats)
-        _update_stats(teams, self._game(80, 70))
+        record_game(teams, "Team A", "Team B", 80, 70)
         assert teams["Team A"].w == 1
         assert teams["Team A"].l == 0
         assert teams["Team B"].l == 1
@@ -71,29 +68,88 @@ class TestUpdateStats:
 
     def test_away_win(self):
         teams = defaultdict(TeamStats)
-        _update_stats(teams, self._game(60, 75))
+        record_game(teams, "Team A", "Team B", 60, 75)
         assert teams["Team A"].l == 1
         assert teams["Team B"].w == 1
 
     def test_draw(self):
         teams = defaultdict(TeamStats)
-        _update_stats(teams, self._game(70, 70))
+        record_game(teams, "Team A", "Team B", 70, 70)
         assert teams["Team A"].d == 1
         assert teams["Team B"].d == 1
 
     def test_points_for_against(self):
         teams = defaultdict(TeamStats)
-        _update_stats(teams, self._game(80, 65))
+        record_game(teams, "Team A", "Team B", 80, 65)
         assert teams["Team A"].pf == 80
         assert teams["Team A"].pa == 65
         assert teams["Team B"].pf == 65
         assert teams["Team B"].pa == 80
 
+    def test_plain_dict_creates_missing_teams(self):
+        teams = {}
+        record_game(teams, "Team A", "Team B", 80, 65)
+        assert teams["Team A"].w == 1
+        assert teams["Team B"].l == 1
+
+    def test_forfeit_loss_deducts_one_point(self):
+        teams = defaultdict(TeamStats)
+        record_game(teams, "Team A", "Team B", 20, 0)
+        assert teams["Team A"].pts == 2
+        assert teams["Team B"].pts == -1
+        assert teams["Team B"].gp == 1
+        assert teams["Team B"].pa == 20
+
+    def test_away_forfeit_loss_deducts_one_point(self):
+        teams = defaultdict(TeamStats)
+        record_game(teams, "Team A", "Team B", 0, 20, forfeit=True)
+        assert teams["Team A"].pts == -1
+        assert teams["Team B"].pts == 2
+
+
+def _game(home: str, away: str, home_score: int, away_score: int) -> Game:
+    return Game(
+        date=datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ),
+        home=home,
+        away=away,
+        home_score=home_score,
+        away_score=away_score,
+    )
+
+
+def _standings_for(games: list[Game]) -> tuple[list[Standing], list[Game]]:
+    teams: dict[str, TeamStats] = defaultdict(TeamStats)
+    for game in games:
+        record_game(teams, game.home, game.away, game.home_score, game.away_score)
+    return [Standing(name, stats) for name, stats in teams.items()], games
+
+
+class TestRankStandings:
+    def test_fewer_games_wins_tie(self):
+        games = [
+            _game("Team A", "Team C", 80, 70),
+            _game("Team A", "Team D", 80, 70),
+            _game("Team B", "Team E", 120, 50),
+            _game("Team B", "Team F", 120, 50),
+            _game("Team G", "Team B", 100, 50),
+        ]
+        standings, games = _standings_for(games)
+        names = [s.name for s in rank_standings(standings, games)]
+        assert names.index("Team A") < names.index("Team B")
+
+    def test_head_to_head_wins_tie(self):
+        games = [
+            _game("Team A", "Team B", 80, 70),
+            _game("Team C", "Team A", 70, 60),
+            _game("Team B", "Team D", 100, 50),
+        ]
+        standings, games = _standings_for(games)
+        names = [s.name for s in rank_standings(standings, games)]
+        assert names.index("Team A") < names.index("Team B")
+
 
 class TestCalculateStandings:
     def test_sorting(self, ergebnisse_path):
-        from korb.standings import calculate_standings
-
         standings, _ = calculate_standings(ergebnisse_path)
         for i in range(len(standings) - 1):
             s1, s2 = standings[i], standings[i + 1]
@@ -103,9 +159,20 @@ class TestCalculateStandings:
                 s2.stats.pf,
             )
 
-    def test_empty_input(self, tmp_path):
-        from korb.standings import calculate_standings
+    def test_forfeit_from_html(self, tmp_path):
+        f = tmp_path / "forfeit.html"
+        f.write_text(
+            "<html><head><title>Ergebnisse - Test (x)</title></head><body>"
+            "<table><tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team A</td><td>Team B</td><td>20 : 0</td></tr></table>"
+            "</body></html>"
+        )
+        standings, _ = calculate_standings(str(f))
+        by_name = {s.name: s.stats for s in standings}
+        assert by_name["Team A"].pts == 2
+        assert by_name["Team B"].pts == -1
 
+    def test_empty_input(self, tmp_path):
         f = tmp_path / "empty.html"
         f.write_text(
             "<html><head>"
@@ -118,8 +185,6 @@ class TestCalculateStandings:
         assert standings == []
 
     def test_returns_league_info(self, ergebnisse_path):
-        from korb.standings import calculate_standings
-
         _standings, league_info = calculate_standings(ergebnisse_path)
         assert league_info.name == "Test Bezirksliga"
         assert league_info.number == 99999

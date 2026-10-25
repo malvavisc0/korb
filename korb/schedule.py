@@ -9,9 +9,10 @@ from datetime import datetime
 
 from korb.core import (
     LOCAL_TZ,
+    DBBRowParser,
     LeagueInfo,
-    _DBBRowParser,
     extract_league_info,
+    normalize_name,
     parse_date,
     print_header,
     read_file_safe,
@@ -43,26 +44,15 @@ class ScheduledGame:
         }
 
 
-class _HTMLScheduleParser(_DBBRowParser):
+class _HTMLScheduleParser(DBBRowParser):
     """Parse basketball-bund.net HTML schedule tables."""
+
+    _row_cancelled: bool
 
     def __init__(self) -> None:
         """Initialize the parser state."""
         super().__init__()
         self.games: list[ScheduledGame] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        """Track table cell and cancellation markers in HTML.
-
-        Args:
-            tag: HTML tag name.
-            attrs: List of (name, value) attribute pairs.
-        """
-        super().handle_starttag(tag, attrs)
-        if tag == "img":
-            for attr_name, attr_val in attrs:
-                if attr_name == "title" and attr_val == "Spiel abgesagt":
-                    self._row_cancelled = True
 
     def _finalize_row(self) -> None:
         """Parse completed row into ScheduledGame if valid."""
@@ -128,23 +118,24 @@ def filter_schedule(
         now = datetime.now(LOCAL_TZ)
         filtered = [g for g in filtered if g.date >= now]
     if team:
-        filtered = [g for g in filtered if _matches_team(g, team.lower())]
+        filtered = [g for g in filtered if _matches_team(g, team)]
     return filtered
 
 
 def _matches_team(game: ScheduledGame, needle: str) -> bool:
-    """True if lowercase ``needle`` appears in either team name."""
-    return needle in game.home.lower() or needle in game.away.lower()
+    """True if normalized ``needle`` appears in either team name."""
+    needle = normalize_name(needle)
+    return needle in normalize_name(game.home) or needle in normalize_name(game.away)
 
 
 def is_season_finalized(html_path: str) -> tuple[bool, int]:
-    """Check if season has no remaining games.
+    """Check whether the schedule has no future games.
 
     Args:
         html_path: Path to HTML schedule file.
 
     Returns:
-        Tuple of (is_finalized, pending_count).
+        Tuple of (no_future_games, future_game_count).
     """
     games, _ = parse_schedule(html_path)
     pending = filter_schedule(games, pending=True)
@@ -182,6 +173,20 @@ def mark_back_to_back(
     return b2b
 
 
+def _b2b_flags(
+    games: list[ScheduledGame],
+    reference: list[ScheduledGame] | None = None,
+) -> dict[int, bool]:
+    """Return back-to-back flags for ``games``, using ``reference`` as context."""
+    source = [g for g in (games if reference is None else reference) if not g.cancelled]
+    flags = mark_back_to_back(source)
+    by_key = {(g.nr, g.date, g.home, g.away): flags[i] for i, g in enumerate(source)}
+    return {
+        i: by_key.get((g.nr, g.date, g.home, g.away), False)
+        for i, g in enumerate(games)
+    }
+
+
 def _cancel_len(name: str, cancelled: bool) -> int:
     """Displayed length of a team name, allowing for the ' [X]' marker."""
     return len(name) + (4 if cancelled else 0)
@@ -201,6 +206,7 @@ def print_schedule(
     games: list[ScheduledGame],
     league_name: str = "Basketball League",
     b2b: bool = False,
+    reference: list[ScheduledGame] | None = None,
 ) -> None:
     """Print schedule table to stdout.
 
@@ -208,13 +214,16 @@ def print_schedule(
         games: List of scheduled games to display.
         league_name: League name for header.
         b2b: Mark back-to-back fixtures.
+        reference: Games to consider for back-to-back context.
     """
     if not games:
         print("No games found.")
         return
 
-    b2b_flags = mark_back_to_back(games) if b2b else {}
+    b2b_flags = _b2b_flags(games, reference) if b2b else {}
     nr_w, day_w, home_w, away_w, venue_w = _schedule_widths(games)
+    if b2b:
+        day_w = max(day_w, max(len(f"{g.day} ⚡") for g in games))
     date_w = 16
 
     print_header("Schedule", league_name)

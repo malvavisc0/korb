@@ -140,6 +140,15 @@ class TestHTMLResultsParser:
         parser.feed("<tr><td>1</td><td>1</td></tr>")
         assert len(parser.games) == 0
 
+    def test_cancelled_img_row_skipped(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team A</td><td>Team B</td>"
+            '<td><img title="Spiel abgesagt"> 0 : 20</td></tr>'
+        )
+        assert len(parser.games) == 0
+
     def test_row_with_missing_score_skipped(self):
         parser = _HTMLResultsParser()
         parser.feed(
@@ -147,6 +156,48 @@ class TestHTMLResultsParser:
             "<td>Team A</td><td>Team B</td><td></td></tr>"
         )
         assert len(parser.games) == 0
+
+    def test_unclosed_row_does_not_discard_later_rows(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team A</td><td>Team B</td><td></td>"
+            "<tr><td>2</td><td>1</td><td>15.01.2026 12:00</td>"
+            "<td>Team C</td><td>Team D</td><td>79 : 75</td></tr>"
+        )
+        assert len(parser.games) == 1
+        assert parser.games[0].home == "Team C"
+
+    def test_nested_table_cells_parsed(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td><table><tr><td>Team A</td></tr></table></td>"
+            "<td>Team B</td><td><table><tr><td>79 : 75</td></tr></table></td>"
+            "</tr>"
+        )
+        assert len(parser.games) == 1
+        assert parser.games[0].nr == 1
+        assert parser.games[0].home == "Team A"
+        assert parser.games[0].home_score == 79
+        assert parser.games[0].forfeit is False
+
+    def test_forfeit_score_flagged(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team A</td><td>Team B</td><td>20 : 0</td></tr>"
+        )
+        assert parser.games[0].forfeit is True
+
+    def test_cells_collapse_whitespace(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team  Alpha</td><td>Team\n Beta</td><td>79 : 75</td></tr>"
+        )
+        assert parser.games[0].home == "Team Alpha"
+        assert parser.games[0].away == "Team Beta"
 
 
 class TestReadGames:
@@ -166,6 +217,12 @@ class TestReadGames:
         # The cancelled game (Team Gamma vs Team Alpha) should not appear
         for g in games:
             assert not (g.home == "Team Gamma" and g.away == "Team Alpha")
+
+    def test_nested_table_fixture(self, ergebnisse_nested_path):
+        games, _ = read_games(ergebnisse_nested_path)
+        assert len(games) == 2
+        assert {g.home for g in games} == {"Team Alpha", "Team Gamma"}
+        assert {g.away for g in games} == {"Team Beta", "Team Delta"}
 
     def test_missing_file_raises(self, tmp_path):
         import pytest
