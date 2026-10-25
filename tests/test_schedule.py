@@ -7,10 +7,9 @@ import pytest
 from korb.core import LOCAL_TZ
 from korb.schedule import (
     ScheduledGame,
-    _b2b_flags,
     _HTMLScheduleParser,
+    b2b_flags,
     filter_schedule,
-    is_season_finalized,
     mark_back_to_back,
     parse_schedule,
     print_schedule,
@@ -134,18 +133,6 @@ class TestFilterSchedule:
         assert not result[0].cancelled
 
 
-class TestIsSeasonFinalized:
-    def test_finalized(self, spielplan_finalized_path):
-        finalized, count = is_season_finalized(spielplan_finalized_path)
-        assert finalized is True
-        assert count == 0
-
-    def test_not_finalized(self, spielplan_path, frozen_now):
-        finalized, count = is_season_finalized(spielplan_path)
-        assert finalized is False
-        assert count > 0
-
-
 class TestMarkBackToBack:
     def test_b2b_detection(self):
         base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
@@ -210,7 +197,7 @@ class TestB2BFlags:
             "Halle",
             False,
         )
-        assert _b2b_flags([pending], [played, pending]) == {0: True}
+        assert b2b_flags([pending], [played, pending]) == {0: True}
 
     def test_cancelled_games_do_not_count(self):
         base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
@@ -224,7 +211,7 @@ class TestB2BFlags:
             "Halle",
             False,
         )
-        assert _b2b_flags([pending], [cancelled, pending]) == {0: False}
+        assert b2b_flags([pending], [cancelled, pending]) == {0: False}
 
 
 class TestPrintScheduleB2B:

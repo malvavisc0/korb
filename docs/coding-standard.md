@@ -33,7 +33,7 @@ into `files/<ligaid>/`.
 
 ## Commands
 ```bash
-uv sync --group dev
+uv sync --group dev --locked
 uv run korb --help
 uv run korb --ligaid 12345 download
 uv run ruff check --fix korb/ tests/

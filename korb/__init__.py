@@ -3,4 +3,4 @@
 Target: DBB Version ≤12.01.1-f733da5 (legacy JSP platform).
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

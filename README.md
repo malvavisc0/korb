@@ -139,6 +139,12 @@ The `predict` command estimates final standings using a **multiplicative efficie
 | **New teams** | <3 games → ratings blended toward league average |
 | **No draws** | Ties broken by home advantage (basketball has OT) |
 
+## Data Notes
+
+- DBB encodes forfeits as `20:0` / `0:20`; korb counts them as completed
+  games, awards the winner 2 points, and deducts 1 point from the loser.
+- Struck-through and cancelled rows are skipped.
+
 ## Project Structure
 
 ```
@@ -164,7 +170,7 @@ korb/
 
 ```bash
 # Install with dev tools
-uv sync --group dev
+uv sync --group dev --locked
 
 # Lint, format & type-check
 uv run ruff check korb/ tests/

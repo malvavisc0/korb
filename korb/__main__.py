@@ -14,7 +14,7 @@ from .core import LeagueInfo, read_games
 from .download import discover_league_ids, download_league, wait_between_requests
 from .ergebnisse import filter_ergebnisse, print_ergebnisse
 from .predict import predict_standings, print_predicted_standings, print_predictions
-from .schedule import filter_schedule, parse_schedule, print_schedule
+from .schedule import b2b_flags, filter_schedule, parse_schedule, print_schedule
 from .standings import Standing, calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
 
@@ -103,7 +103,7 @@ def cmd_team(args: argparse.Namespace) -> None:
     fp = _resolve_results(args, "team results")
     results, league_info = get_team_results(args.name, fp)
     if args.json:
-        data = [r.to_dict() for r in results]
+        data = [r.to_dict() for r in sorted(results, key=lambda r: r.date)]
         _json_out(
             {
                 **_liga_meta(league_info, args.ligaid),
@@ -154,11 +154,15 @@ def cmd_schedule(args: argparse.Namespace) -> None:
     filtered = filter_schedule(
         games, show_all=args.all, pending=args.pending, team=args.team
     )
+    flags = b2b_flags(filtered, games) if args.b2b else {}
     if args.json:
         _json_out(
             {
                 **_liga_meta(league_info, args.ligaid),
-                "schedule": [g.to_dict() for g in filtered],
+                "schedule": [
+                    {**g.to_dict(), "b2b": flags.get(i, False)}
+                    for i, g in enumerate(filtered)
+                ],
             }
         )
     else:

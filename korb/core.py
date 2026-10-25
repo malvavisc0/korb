@@ -59,7 +59,7 @@ def normalize_whitespace(value: str) -> str:
 
 def normalize_name(value: str) -> str:
     """Normalize a team name for case-insensitive matching."""
-    return normalize_whitespace(value).lower()
+    return normalize_whitespace(value).casefold()
 
 
 def is_forfeit_score(home_score: int, away_score: int) -> bool:
@@ -105,7 +105,7 @@ def parse_score(score_str: str | None) -> tuple[int | None, int | None]:
 
 
 def read_file_safe(filepath: str) -> str:
-    """Read file with user-friendly error on missing file.
+    """Read a UTF-8 file with a user-friendly error on failure.
 
     Args:
         filepath: Path to file to read.
@@ -114,13 +114,13 @@ def read_file_safe(filepath: str) -> str:
         File contents as string.
 
     Raises:
-        SystemExit: If file not found.
+        SystemExit: If the file cannot be read.
     """
     try:
         with open(filepath, encoding="utf-8") as f:
             return f.read()
-    except FileNotFoundError:
-        print(f"Error: File not found: {filepath}", file=sys.stderr)
+    except OSError as exc:
+        print(f"Error: Cannot read {filepath}: {exc}", file=sys.stderr)
         sys.exit(1)
 
 

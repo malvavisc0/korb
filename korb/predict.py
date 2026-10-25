@@ -6,6 +6,7 @@ predict matchup scores.  Recent games are weighted more heavily.
 Target: DBB Version ≤12.01.1-f733da5 (legacy JSP platform).
 """
 
+import sys
 from collections import defaultdict
 from math import exp, sqrt
 from typing import Literal
@@ -76,8 +77,6 @@ def _calc_strength(
     if not games:
         return {}, {}, 50.0
 
-    ref_ts = max(g.date.timestamp() for g in games)
-
     teams: dict[str, TeamStats] = defaultdict(TeamStats)
     for game in games:
         record_game(
@@ -89,11 +88,26 @@ def _calc_strength(
             forfeit=game.forfeit,
         )
 
+    performance = [game for game in games if not game.forfeit]
+    if not performance:
+        return dict(teams), {}, 50.0
+
+    ref_ts = max(g.date.timestamp() for g in performance)
+
     w_pf: dict[str, float] = defaultdict(float)
     w_pa: dict[str, float] = defaultdict(float)
     w_gp: dict[str, float] = defaultdict(float)
+    performance_teams: dict[str, TeamStats] = defaultdict(TeamStats)
 
-    for game in games:
+    for game in performance:
+        record_game(
+            performance_teams,
+            game.home,
+            game.away,
+            game.home_score,
+            game.away_score,
+            forfeit=False,
+        )
         w = _recency_weight(game, ref_ts)
         for name, pf, pa in [
             (game.home, game.home_score, game.away_score),
@@ -107,14 +121,14 @@ def _calc_strength(
     total_gp = sum(w_gp.values())
     league_avg = total_pf / total_gp if total_gp else 50.0
 
-    form_pf, form_pa, form_gp = _calc_form_totals(games)
+    form_pf, form_pa, form_gp = _calc_form_totals(performance)
 
     ratings = _build_ratings(
         w_pf,
         w_pa,
         w_gp,
         league_avg,
-        teams,
+        performance_teams,
         form_pf,
         form_pa,
         form_gp,
@@ -261,14 +275,15 @@ def _copy_stats(teams_base: dict[str, TeamStats]) -> dict[str, TeamStats]:
     return teams
 
 
-def _pending_games(html_path: str, played: list[Game]) -> list[ScheduledGame]:
+def _pending_games(
+    schedule: list[ScheduledGame], played: list[Game]
+) -> list[ScheduledGame]:
     """Return scheduled games not already present in results."""
     played_numbers = {g.nr for g in played if g.nr is not None}
     played_keys = {
         (normalize_name(g.home), normalize_name(g.away), g.date.strftime("%d.%m.%Y"))
         for g in played
     }
-    schedule, _ = parse_schedule(html_path)
     pending = [
         g
         for g in filter_schedule(schedule)
@@ -284,24 +299,27 @@ def _pending_games(html_path: str, played: list[Game]) -> list[ScheduledGame]:
     return pending
 
 
-def _last_game_times(played: list[Game]) -> dict[str, float]:
-    """Map each team to the timestamp of its most recent played game."""
-    last_game_ts: dict[str, float] = {}
-    for g in played:
-        ts = g.date.timestamp()
-        for name in (g.home, g.away):
-            if ts > last_game_ts.get(name, 0):
-                last_game_ts[name] = ts
-    return last_game_ts
+def _game_times(played: list[Game]) -> dict[str, list[float]]:
+    """Map each team to its played game timestamps, excluding forfeits."""
+    times: dict[str, list[float]] = defaultdict(list)
+    for game in played:
+        if game.forfeit:
+            continue
+        ts = game.date.timestamp()
+        times[game.home].append(ts)
+        times[game.away].append(ts)
+    return times
 
 
 def _fatigue(
-    name: str, gt: float, last_game_ts: dict[str, float], threshold_s: float
+    name: str, gt: float, game_times: dict[str, list[float]], threshold_s: float
 ) -> float:
     """Return the fatigue multiplier for a team playing at time ``gt``."""
-    if name in last_game_ts and (gt - last_game_ts[name]) <= threshold_s:
-        return FATIGUE_PENALTY
-    return 1.0
+    previous = [ts for ts in game_times.get(name, []) if ts < gt]
+    if not previous:
+        return 1.0
+    delta = gt - max(previous)
+    return FATIGUE_PENALTY if delta <= threshold_s else 1.0
 
 
 def predict_standings(
@@ -324,18 +342,31 @@ def predict_standings(
         contains league metadata.
     """
     played, league_info = read_games(results_path)
+    schedule, schedule_info = parse_schedule(html_path)
+    if (
+        league_info.number is not None
+        and schedule_info.number is not None
+        and league_info.number != schedule_info.number
+    ):
+        print(
+            "Error: Results and schedule are from different leagues "
+            f"({league_info.number} != {schedule_info.number}).",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     teams_base, ratings, league_avg = _calc_strength(played)
     teams = _copy_stats(teams_base)
-    pending = _pending_games(html_path, played)
+    pending = _pending_games(schedule, played)
 
-    last_game_ts = _last_game_times(played)
+    game_times = _game_times(played)
     threshold_s = FATIGUE_THRESHOLD_H * 3600
 
     preds: list[Prediction] = []
     for game in pending:
         gt = game.date.timestamp()
-        h_fat = _fatigue(game.home, gt, last_game_ts, threshold_s)
-        a_fat = _fatigue(game.away, gt, last_game_ts, threshold_s)
+        h_fat = _fatigue(game.home, gt, game_times, threshold_s)
+        a_fat = _fatigue(game.away, gt, game_times, threshold_s)
 
         winner, hs, as_ = predict_game(
             game.home,
@@ -346,8 +377,8 @@ def predict_standings(
             away_fatigue=a_fat,
         )
 
-        last_game_ts[game.home] = gt
-        last_game_ts[game.away] = gt
+        game_times[game.home].append(gt)
+        game_times[game.away].append(gt)
         preds.append((game, winner, hs, as_))
         record_game(teams, game.home, game.away, hs, as_, forfeit=False)
 

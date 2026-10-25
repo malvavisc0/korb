@@ -2,15 +2,22 @@
 
 from datetime import datetime, timedelta
 
+import pytest
+
 from korb.core import LOCAL_TZ, Game
 from korb.predict import (
     _build_ratings,
     _calc_form_totals,
+    _calc_strength,
+    _fatigue,
+    _game_times,
     _pending_games,
     _recency_weight,
     calc_strength,
     predict_game,
+    predict_standings,
 )
+from korb.schedule import parse_schedule
 from korb.standings import TeamStats
 
 
@@ -162,9 +169,23 @@ class TestPredictGame:
 
 
 class TestPredictStandings:
-    def test_full_integration(self, ergebnisse_path, spielplan_path):
-        from korb.predict import predict_standings
+    def test_forfeits_do_not_affect_ratings(self):
+        normal = _make_game("Team A", "Team B", 80, 70)
+        forfeit = Game(
+            date=normal.date,
+            home="Team A",
+            away="Team C",
+            home_score=20,
+            away_score=0,
+            nr=2,
+            forfeit=True,
+        )
+        _teams, ratings, league_avg = _calc_strength([normal, forfeit])
+        _teams_only, ratings_only, league_avg_only = _calc_strength([normal])
+        assert ratings == ratings_only
+        assert league_avg == league_avg_only
 
+    def test_full_integration(self, ergebnisse_path, spielplan_path):
         standings, _preds, league_info = predict_standings(
             ergebnisse_path, spielplan_path
         )
@@ -181,14 +202,40 @@ class TestPredictStandings:
             )
 
     def test_no_pending_games(self, ergebnisse_path, spielplan_finalized_path):
-        from korb.predict import predict_standings
-
         standings, preds, _ = predict_standings(
             ergebnisse_path, spielplan_finalized_path
         )
         assert len(preds) == 0
         # Standings should still reflect completed games
         assert len(standings) > 0
+
+
+class TestFatigue:
+    def test_prior_game_within_threshold(self):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        times = {"Team A": [(base - timedelta(hours=24)).timestamp()]}
+        assert _fatigue("Team A", base.timestamp(), times, 36 * 3600) == 0.95
+
+    def test_prior_game_outside_threshold(self):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        times = {"Team A": [(base - timedelta(hours=48)).timestamp()]}
+        assert _fatigue("Team A", base.timestamp(), times, 36 * 3600) == 1.0
+
+    def test_later_game_does_not_cause_fatigue(self):
+        base = datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ)
+        times = {"Team A": [(base + timedelta(hours=24)).timestamp()]}
+        assert _fatigue("Team A", base.timestamp(), times, 36 * 3600) == 1.0
+
+    def test_forfeits_are_ignored(self):
+        game = Game(
+            date=datetime(2026, 1, 15, 10, 0, tzinfo=LOCAL_TZ),
+            home="Team A",
+            away="Team B",
+            home_score=20,
+            away_score=0,
+            forfeit=True,
+        )
+        assert _game_times([game]) == {}
 
 
 class TestPendingGames:
@@ -200,7 +247,8 @@ class TestPendingGames:
             "<td>Team A</td><td>Team B</td><td>Halle</td></tr></table>"
             "</body></html>"
         )
-        assert len(_pending_games(str(path), [])) == 1
+        schedule, _ = parse_schedule(str(path))
+        assert len(_pending_games(schedule, [])) == 1
 
     def test_played_fixture_excluded_by_number(self, tmp_path, frozen_now):
         path = tmp_path / "spielplan.html"
@@ -220,4 +268,18 @@ class TestPendingGames:
                 away_score=70,
             )
         ]
-        assert _pending_games(str(path), played) == []
+        schedule, _ = parse_schedule(str(path))
+        assert _pending_games(schedule, played) == []
+
+
+class TestLeagueValidation:
+    def test_mismatched_league_numbers_exit(self, ergebnisse_path, tmp_path):
+        schedule = tmp_path / "spielplan.html"
+        schedule.write_text(
+            "<html><head><title>Spielplan - Other (x; Liganr.: 11111)</title></head>"
+            "<body><table><tr><td>1</td><td>1</td><td>01.06.2026 10:00</td>"
+            "<td>Team Alpha</td><td>Team Beta</td><td>Halle</td></tr></table>"
+            "</body></html>"
+        )
+        with pytest.raises(SystemExit):
+            predict_standings(ergebnisse_path, str(schedule))

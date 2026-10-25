@@ -16,7 +16,7 @@ from korb.__main__ import (
     cmd_top,
     main,
 )
-from korb.core import LOCAL_TZ
+from korb.core import DATE_FMT, LOCAL_TZ
 
 
 def _make_args(**kwargs) -> argparse.Namespace:
@@ -97,6 +97,8 @@ class TestCmdTeam:
         assert "ligaid" in data
         assert "team" in data
         assert "results" in data
+        dates = [datetime.strptime(r["date"], DATE_FMT) for r in data["results"]]
+        assert dates == sorted(dates)
 
     def test_bars_and_metrics(self, ergebnisse_path, capsys):
         args = _make_args(
@@ -191,6 +193,38 @@ class TestCmdSchedule:
         assert "liga_number" in data
         assert "ligaid" in data
         assert isinstance(data["schedule"], list)
+        assert all(game["b2b"] is False for game in data["schedule"])
+
+    def test_json_output_marks_b2b(self, tmp_path, capsys):
+        now = datetime.now(LOCAL_TZ)
+        rows = [
+            (now + timedelta(hours=12), "Team A", "Team B"),
+            (now + timedelta(hours=36), "Team A", "Team C"),
+        ]
+        html = "<html><head><title>Spielplan - Test (x)</title></head><body>"
+        html += "<table>"
+        for nr, (date, home, away) in enumerate(rows, 1):
+            html += (
+                f"<tr><td>{nr}</td><td>1</td>"
+                f"<td>{date.strftime('%d.%m.%Y %H:%M')}</td>"
+                f"<td>{home}</td><td>{away}</td><td>Halle</td></tr>"
+            )
+        html += "</table></body></html>"
+        path = tmp_path / "spielplan.html"
+        path.write_text(html)
+
+        args = _make_args(
+            schedule=str(path),
+            ligaid=None,
+            all=False,
+            pending=False,
+            team=None,
+            json=True,
+            b2b=True,
+        )
+        cmd_schedule(args)
+        data = json.loads(capsys.readouterr().out)
+        assert [game["b2b"] for game in data["schedule"]] == [False, True]
 
 
 class TestCmdTop:

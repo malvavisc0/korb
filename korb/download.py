@@ -77,6 +77,12 @@ def read_response(resp: http.client.HTTPResponse) -> bytes:
     return raw
 
 
+def _is_expected_page(data: bytes, marker: str, ligaid: int) -> bool:
+    """Return True if the HTML belongs to the expected league page."""
+    text = data.decode("utf-8", errors="replace")
+    return marker in text and f"liga_id={ligaid}" in text
+
+
 def download_league(ligaid: int) -> None:
     """Download results and schedule HTML for a league.
 
@@ -88,10 +94,18 @@ def download_league(ligaid: int) -> None:
     out = out_root / str(ligaid)
     out.mkdir(exist_ok=True)
     targets = [
-        (RESULTS_URL.format(liga_id=ligaid), out / "ergebnisse.html"),
-        (SCHEDULE_URL.format(liga_id=ligaid), out / "spielplan.html"),
+        (
+            RESULTS_URL.format(liga_id=ligaid),
+            out / "ergebnisse.html",
+            "ErgebnisseViewPublic",
+        ),
+        (
+            SCHEDULE_URL.format(liga_id=ligaid),
+            out / "spielplan.html",
+            "SpielplanViewPublic",
+        ),
     ]
-    for i, (url, dest) in enumerate(targets):
+    for i, (url, dest, marker) in enumerate(targets):
         if i > 0:
             wait_between_requests()
         print(
@@ -105,6 +119,12 @@ def download_league(ligaid: int) -> None:
                 data = read_response(resp)
                 if not data.strip():
                     print("FAILED: empty response", file=sys.stderr)
+                    sys.exit(1)
+                if not _is_expected_page(data, marker, ligaid):
+                    print(
+                        f"FAILED: unexpected response (no {marker})",
+                        file=sys.stderr,
+                    )
                     sys.exit(1)
                 _ = dest.write_bytes(data)
             print("OK")

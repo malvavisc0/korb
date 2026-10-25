@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.1] — 2026-10-25
+
+### Changed
+
+- Committed `uv.lock`; CI now installs with `uv sync --locked`.
+- Release workflow publishes to PyPI before creating the GitHub release
+  and pins third-party actions by commit.
+- Team JSON results are chronological, matching text output and the
+  other data commands.
+
+### Fixed
+
+- Prediction fatigue uses the latest game before each fixture and never
+  treats a later game as fatigue.
+- Forfeits are excluded from offensive/defensive ratings, recent form,
+  and fatigue inputs while remaining in standings.
+- Mismatched results and schedule league numbers now exit with an error.
+- Downloaded pages must have the expected `Ergebnisse`/`Spielplan`
+  title, preventing non-empty error pages from replacing cached data.
+- `read_file_safe` reports directories and permission failures cleanly.
+- `schedule --json --b2b` now includes per-game `b2b` flags.
+- Team-name matching uses Unicode case folding (`Straße` matches
+  `STRASSE`).
+- Removed the unused, inconsistent `is_season_finalized` helper.
+
 ## [0.3.0] — 2026-10-25
 
 ### Added

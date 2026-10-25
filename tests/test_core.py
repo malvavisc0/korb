@@ -2,13 +2,17 @@
 
 from datetime import datetime
 
+import pytest
+
 from korb.core import (
     LOCAL_TZ,
     LeagueInfo,
     _HTMLResultsParser,
     extract_league_info,
+    normalize_name,
     parse_date,
     parse_score,
+    read_file_safe,
     read_games,
 )
 
@@ -53,6 +57,24 @@ class TestParseScore:
 
     def test_non_numeric(self):
         assert parse_score("ab : cd") == (None, None)
+
+
+class TestNormalizeName:
+    def test_casefold(self):
+        assert normalize_name("Straße") == normalize_name("STRASSE")
+
+    def test_whitespace(self):
+        assert normalize_name("  Team   Alpha  ") == "team alpha"
+
+
+class TestReadFileSafe:
+    def test_missing_file_exits(self, tmp_path):
+        with pytest.raises(SystemExit):
+            read_file_safe(str(tmp_path / "missing.html"))
+
+    def test_directory_exits(self, tmp_path):
+        with pytest.raises(SystemExit):
+            read_file_safe(str(tmp_path))
 
 
 class TestExtractLeagueInfo:
@@ -225,7 +247,5 @@ class TestReadGames:
         assert {g.away for g in games} == {"Team Beta", "Team Delta"}
 
     def test_missing_file_raises(self, tmp_path):
-        import pytest
-
         with pytest.raises(SystemExit):
             read_games(str(tmp_path / "nonexistent.html"))

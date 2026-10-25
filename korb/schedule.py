@@ -128,20 +128,6 @@ def _matches_team(game: ScheduledGame, needle: str) -> bool:
     return needle in normalize_name(game.home) or needle in normalize_name(game.away)
 
 
-def is_season_finalized(html_path: str) -> tuple[bool, int]:
-    """Check whether the schedule has no future games.
-
-    Args:
-        html_path: Path to HTML schedule file.
-
-    Returns:
-        Tuple of (no_future_games, future_game_count).
-    """
-    games, _ = parse_schedule(html_path)
-    pending = filter_schedule(games, pending=True)
-    return len(pending) == 0, len(pending)
-
-
 def mark_back_to_back(
     games: list[ScheduledGame], threshold_h: int = 36
 ) -> dict[int, bool]:
@@ -173,7 +159,7 @@ def mark_back_to_back(
     return b2b
 
 
-def _b2b_flags(
+def b2b_flags(
     games: list[ScheduledGame],
     reference: list[ScheduledGame] | None = None,
 ) -> dict[int, bool]:
@@ -220,7 +206,7 @@ def print_schedule(
         print("No games found.")
         return
 
-    b2b_flags = _b2b_flags(games, reference) if b2b else {}
+    flags = b2b_flags(games, reference) if b2b else {}
     nr_w, day_w, home_w, away_w, venue_w = _schedule_widths(games)
     if b2b:
         day_w = max(day_w, max(len(f"{g.day} ⚡") for g in games))
@@ -240,7 +226,7 @@ def print_schedule(
         home = f"{g.home} [X]" if g.cancelled else g.home
         away = f"{g.away} [X]" if g.cancelled else g.away
         date_str = g.date.strftime("%d.%m.%y %H:%M")
-        tag = f"{g.day} ⚡" if b2b_flags.get(i, False) else str(g.day)
+        tag = f"{g.day} ⚡" if flags.get(i, False) else str(g.day)
 
         print(
             f"{g.nr:<{nr_w}}  {tag:>{day_w}}  "

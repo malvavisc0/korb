@@ -55,6 +55,13 @@ class TestHeaders:
         assert HEADERS["DNT"] == "1"
 
 
+def _valid_html(marker: str) -> bytes:
+    return (
+        f'<html><body><a href="index?viewDescKey={marker}&liga_id=12345">'
+        "x</a></body></html>"
+    ).encode()
+
+
 def _fake_response(body: bytes, encoding: str = "") -> MagicMock:
     """Build a mock HTTP response with the given body & encoding."""
     resp = MagicMock()
@@ -109,7 +116,10 @@ class TestDownload:
         mock_resp = MagicMock()
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_resp.read.return_value = b"<html></html>"
+        mock_resp.read.side_effect = [
+            _valid_html("ErgebnisseViewPublic"),
+            _valid_html("SpielplanViewPublic"),
+        ]
         mock_resp.headers = MagicMock()
         mock_resp.headers.get.return_value = ""
         mock_urlopen.return_value = mock_resp
@@ -146,7 +156,10 @@ class TestDownload:
         mock_resp = MagicMock()
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
-        mock_resp.read.return_value = b"<html></html>"
+        mock_resp.read.side_effect = [
+            _valid_html("ErgebnisseViewPublic"),
+            _valid_html("SpielplanViewPublic"),
+        ]
         mock_resp.headers = MagicMock()
         mock_resp.headers.get.return_value = ""
         mock_urlopen.return_value = mock_resp
@@ -270,6 +283,23 @@ class TestDownloadFailure:
         mock_resp.__enter__ = MagicMock(return_value=mock_resp)
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_resp.read.return_value = b"  \n"
+        mock_resp.headers.get.return_value = ""
+        mock_urlopen.return_value = mock_resp
+
+        with pytest.raises(SystemExit):
+            download_league(12345)
+
+        assert not (tmp_path / "files" / "12345" / "ergebnisse.html").exists()
+
+    @patch("korb.download.urllib.request.urlopen")
+    def test_unexpected_page_exits_without_writing(
+        self, mock_urlopen, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        mock_resp = MagicMock()
+        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.read.return_value = b"<html><head><title>Login</title></head></html>"
         mock_resp.headers.get.return_value = ""
         mock_urlopen.return_value = mock_resp
 

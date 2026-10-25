@@ -11,9 +11,6 @@ build/
 .coverage.*
 htmlcov/
 
-# Lock file
-uv.lock
-
 # Downloaded HTML data (keep folders via .gitkeep)
 files/**/*.html
 
