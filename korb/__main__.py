@@ -10,10 +10,17 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .backtest import DEFAULT_MIN_TRAIN, backtest, print_backtest
 from .core import LeagueInfo, read_games
 from .download import discover_league_ids, download_league, wait_between_requests
 from .ergebnisse import filter_ergebnisse, print_ergebnisse
-from .predict import predict_standings, print_predicted_standings, print_predictions
+from .predict import (
+    PredictionError,
+    format_prediction,
+    predict_standings,
+    print_predicted_standings,
+    print_predictions,
+)
 from .schedule import b2b_flags, filter_schedule, parse_schedule, print_schedule
 from .standings import Standing, calculate_standings, print_table
 from .team import get_team_results, print_bars, print_metrics, print_results
@@ -174,7 +181,11 @@ def cmd_predict(args: argparse.Namespace) -> None:
     rp = _resolve_results(args, "prediction results")
     sp = _resolve_schedule(args, "prediction schedule")
 
-    standings, preds, league_info = predict_standings(rp, sp)
+    try:
+        standings, preds, league_info = predict_standings(rp, sp)
+    except PredictionError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
     if not preds:
         print(
             "Error: Season is finalized (no pending games). "
@@ -186,22 +197,28 @@ def cmd_predict(args: argparse.Namespace) -> None:
         _json_out(
             {
                 **_liga_meta(league_info, args.ligaid),
-                "predictions": [
-                    {
-                        "home": g.home,
-                        "away": g.away,
-                        "winner": w,
-                        "home_score": hs,
-                        "away_score": aws,
-                    }
-                    for g, w, hs, aws in preds
-                ],
+                "predictions": [format_prediction(pred) for pred in preds],
                 "standings": [s.to_dict() for s in standings],
             }
         )
     else:
         print_predictions(preds)
         print_predicted_standings(standings)
+
+
+def cmd_backtest(args: argparse.Namespace) -> None:
+    """Handle 'backtest' subcommand."""
+    fp = _resolve_results(args, "backtest")
+    result, league_info = backtest(fp, min_train_games=args.min_train)
+    if args.json:
+        _json_out(
+            {
+                **_liga_meta(league_info, args.ligaid),
+                "backtest": result.to_dict(),
+            }
+        )
+    else:
+        print_backtest(result)
 
 
 def _blocks(value: int, scale: int) -> str:
@@ -403,6 +420,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Predict final standings",
     )
     p_pr.set_defaults(func=cmd_predict)
+
+    p_bt = subs.add_parser(
+        "backtest",
+        help="Backtest the prediction model on completed games",
+    )
+    p_bt.add_argument(
+        "--min-train",
+        type=_positive_int,
+        default=DEFAULT_MIN_TRAIN,
+        help=f"Minimum prior games before evaluating (default: {DEFAULT_MIN_TRAIN})",
+    )
+    p_bt.set_defaults(func=cmd_backtest)
 
     p_top = subs.add_parser(
         "top",

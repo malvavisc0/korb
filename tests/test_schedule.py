@@ -229,3 +229,24 @@ class TestPrintScheduleB2B:
         row = next(line for line in lines if line.startswith("2"))
         assert "⚡" in row
         assert row.index("15.01.26") == header.index("Datum")
+
+    def test_empty_schedule_message(self, capsys):
+        print_schedule([], "League")
+        assert "No games found." in capsys.readouterr().out
+
+
+class TestParseScheduleSkipsInvalidDates:
+    def test_bad_date_row_is_skipped(self, tmp_path):
+        html = (
+            "<html><head><title>Spielplan - Test (x)</title></head><body>"
+            "<table>"
+            "<tr><td>1</td><td>1</td><td>not-a-date</td>"
+            "<td>Team A</td><td>Team B</td><td>Halle</td></tr>"
+            "<tr><td>2</td><td>1</td><td>15.01.2026 10:00</td>"
+            "<td>Team C</td><td>Team D</td><td>Halle</td></tr>"
+            "</table></body></html>"
+        )
+        path = tmp_path / "spielplan.html"
+        path.write_text(html)
+        games, _ = parse_schedule(str(path))
+        assert [game.nr for game in games] == [2]

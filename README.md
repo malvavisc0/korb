@@ -21,8 +21,10 @@ platform and provides standings, results, schedules, predictions, and more.
 - 🏀 **Team** — game-by-game results, sparklines, quality metrics
 - 📋 **Ergebnisse** — all completed game results with optional team filter
 - 📅 **Schedule** — with back-to-back detection, filtering, pending games
-- 🔮 **Predict** — efficiency-model-based final standings forecast
+- 🔮 **Predict** — opponent-adjusted final standings forecast with
+  win probabilities
 - 🥇 **Top** — quick leaderboard with ASCII bar chart
+- 🧪 **Backtest** — chronological holdout metrics for the prediction model
 - 📥 **Download** — fetch fresh HTML data directly from basketball-bund.net
 - 🔧 **`--json`** — machine-readable output for data commands (not `download`)
 
@@ -105,7 +107,18 @@ uv run korb --ligaid 12345 schedule --team "Hawks" --pending --b2b
 
 ```bash
 uv run korb --ligaid 12345 predict
+uv run korb --ligaid 12345 --json predict
 ```
+
+### `backtest` — Evaluate the prediction model
+
+```bash
+uv run korb --ligaid 12345 backtest
+uv run korb --ligaid 12345 backtest --min-train 10
+```
+
+Trains on each game's prior results only and reports winner accuracy,
+Brier score, score MAE, and score RMSE.
 
 ### `top` — Quick leaderboard
 
@@ -126,18 +139,22 @@ uv run korb --ligaid 12345 top -n 5
 
 ## How Predictions Work
 
-The `predict` command estimates final standings using a **multiplicative efficiency model**:
+The `predict` command fits opponent-adjusted ratings and converts them
+into a **multiplicative efficiency model**:
 
 | Factor | How it works |
 |---|---|
-| **Offensive rating** | Team's scored points vs. league average (>1.0 = above avg) |
-| **Defensive rating** | Points allowed vs. league average (>1.0 = worse defense) |
+| **Opponent adjustment** | Weighted ridge regression on point differentials |
+| **Offensive rating** | Adjusted scoring strength relative to league average (>1.0 = above avg) |
+| **Defensive rating** | Adjusted points allowed relative to league average (>1.0 = worse defense) |
 | **Recency weighting** | 60-day half-life — recent games count more |
-| **Recent form** | Last 5 games blended at 30% weight into ratings |
-| **Home advantage** | 3% scoring boost applied symmetrically |
+| **Recent form** | Last 5 opponent-adjusted residuals blended at 30% weight |
+| **Regularization** | Ridge shrinkage replaces the hard 3-game cutoff |
+| **Home advantage** | Fitted from results with a 3% prior |
+| **Win probability** | Normal margin model using fitted score volatility |
 | **B2B fatigue** | ≤36h between games → 5% offense/defense penalty |
-| **New teams** | <3 games → ratings blended toward league average |
-| **No draws** | Ties broken by home advantage (basketball has OT) |
+| **No draws** | The higher win probability decides ties |
+| **Backtest** | `backtest` evaluates the model chronologically |
 
 ## Data Notes
 
@@ -151,10 +168,12 @@ The `predict` command estimates final standings using a **multiplicative efficie
 korb/
 ├── __init__.py      # Package marker & version
 ├── __main__.py      # CLI entry point & command handlers
+├── backtest.py      # Chronological model evaluation
 ├── core.py          # Shared models, HTML parsing, utilities
 ├── download.py      # HTTP downloader, headers, rate limiting
 ├── ergebnisse.py    # Game results viewer & filter
-├── predict.py       # Multiplicative efficiency prediction model
+├── model.py         # Opponent-adjusted ratings & score model
+├── predict.py       # Final standings orchestration & output
 ├── schedule.py      # HTML schedule parser & filters
 ├── standings.py     # Standings calculator
 └── team.py          # Team results viewer & metrics

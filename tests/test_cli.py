@@ -4,11 +4,16 @@ import argparse
 import json
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from korb import __version__
 from korb.__main__ import (
+    _positive_int,
+    _resolve_results,
+    _resolve_schedule,
+    cmd_backtest,
     cmd_predict,
     cmd_schedule,
     cmd_standings,
@@ -279,6 +284,75 @@ class TestMain:
         main()
         assert "Standings" in capsys.readouterr().out
 
+    def test_resolve_requires_path_or_ligaid(self):
+        args = _make_args(results=None, schedule=None, ligaid=None)
+        with pytest.raises(SystemExit):
+            _resolve_results(args, "standings")
+
+    def test_resolve_from_ligaid(self):
+        args = _make_args(results=None, schedule=None, ligaid=12345)
+        path = Path(_resolve_results(args, "standings"))
+        assert path == Path("files") / "12345" / "ergebnisse.html"
+        schedule = Path(_resolve_schedule(args, "prediction schedule"))
+        assert schedule == Path("files") / "12345" / "spielplan.html"
+
+    def test_positive_int_accepts_valid_value(self):
+        assert _positive_int("7") == 7
+
+    def test_positive_int_rejects_zero(self):
+        with pytest.raises(argparse.ArgumentTypeError):
+            _positive_int("0")
+
+    def test_download_flag_downloads_league(self, monkeypatch, ergebnisse_path, capsys):
+        calls = []
+        monkeypatch.setattr(
+            "korb.__main__.download_league",
+            lambda ligaid: calls.append(ligaid),
+        )
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "korb",
+                "--ligaid",
+                "12345",
+                "--download",
+                "--results",
+                ergebnisse_path,
+                "standings",
+            ],
+        )
+        main()
+        assert calls == [12345]
+        assert "Standings" in capsys.readouterr().out
+
+    def test_download_flag_requires_ligaid(self, monkeypatch):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["korb", "--download", "--results", "x.html", "standings"],
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 1
+
+    def test_backtest_requires_min_train_flag_value(self, monkeypatch, ergebnisse_path):
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            [
+                "korb",
+                "--results",
+                ergebnisse_path,
+                "backtest",
+                "--min-train",
+                "0",
+            ],
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+        assert exc_info.value.code == 2
+
     def test_version_exits_zero(self, monkeypatch, capsys):
         monkeypatch.setattr(sys, "argv", ["korb", "--version"])
         with pytest.raises(SystemExit) as exc_info:
@@ -342,3 +416,60 @@ class TestCmdPredict:
         cmd_predict(args)
         captured = capsys.readouterr()
         assert "Predicted" in captured.out
+        assert "%" in captured.out
+
+    def test_json_output(self, ergebnisse_path, spielplan_path, capsys, frozen_now):
+        args = _make_args(
+            results=ergebnisse_path,
+            schedule=spielplan_path,
+            ligaid=None,
+            json=True,
+        )
+        cmd_predict(args)
+        data = json.loads(capsys.readouterr().out)
+        assert data["predictions"]
+        prediction = data["predictions"][0]
+        assert set(prediction) >= {
+            "nr",
+            "date",
+            "home",
+            "away",
+            "winner",
+            "home_score",
+            "away_score",
+            "win_probability",
+        }
+        assert 0.0 <= prediction["win_probability"] <= 1.0
+
+    def test_mismatched_leagues_exit(self, ergebnisse_path, tmp_path):
+        schedule = tmp_path / "spielplan.html"
+        schedule.write_text(
+            "<html><head><title>Spielplan - Other (x; Liganr.: 11111)</title></head>"
+            "<body><table><tr><td>1</td><td>1</td><td>01.06.2026 10:00</td>"
+            "<td>Team Alpha</td><td>Team Beta</td><td>Halle</td></tr></table>"
+            "</body></html>"
+        )
+        args = _make_args(
+            results=ergebnisse_path,
+            schedule=str(schedule),
+            ligaid=None,
+            json=False,
+        )
+        with pytest.raises(SystemExit):
+            cmd_predict(args)
+
+
+class TestCmdBacktest:
+    def test_text_output(self, ergebnisse_path, capsys):
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=False, min_train=2)
+        cmd_backtest(args)
+        output = capsys.readouterr().out
+        assert "Prediction Backtest" in output
+        assert "Winner accuracy" in output
+
+    def test_json_output(self, ergebnisse_path, capsys):
+        args = _make_args(results=ergebnisse_path, ligaid=None, json=True, min_train=2)
+        cmd_backtest(args)
+        data = json.loads(capsys.readouterr().out)
+        assert data["backtest"]["games"] > 0
+        assert "brier" in data["backtest"]

@@ -60,6 +60,11 @@ addopts = "-v --cov=korb --cov-report=term-missing"
 source = ["korb"]
 omit = ["tests/*"]
 
+[tool.coverage.report]
+exclude_lines = [
+  "if __name__ == .__main__.:",
+]
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"

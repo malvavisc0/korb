@@ -8,9 +8,21 @@ from korb.standings import (
     Standing,
     TeamStats,
     calculate_standings,
+    print_standings_rows,
+    print_table,
     rank_standings,
     record_game,
 )
+
+
+class TestEmptyPrints:
+    def test_print_standings_rows_empty_is_noop(self, capsys):
+        print_standings_rows([])
+        assert capsys.readouterr().out == ""
+
+    def test_print_table_empty_message(self, capsys):
+        print_table([], "League")
+        assert "No standings data." in capsys.readouterr().out
 
 
 class TestTeamStatsDiff:

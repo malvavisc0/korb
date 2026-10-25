@@ -6,6 +6,7 @@ import pytest
 
 from korb.core import (
     LOCAL_TZ,
+    DBBRowParser,
     LeagueInfo,
     _HTMLResultsParser,
     extract_league_info,
@@ -220,6 +221,18 @@ class TestHTMLResultsParser:
         )
         assert parser.games[0].home == "Team Alpha"
         assert parser.games[0].away == "Team Beta"
+
+    def test_bad_date_row_skipped(self):
+        parser = _HTMLResultsParser()
+        parser.feed(
+            "<tr><td>1</td><td>1</td><td>not-a-date</td>"
+            "<td>Team A</td><td>Team B</td><td>79 : 75</td></tr>"
+        )
+        assert len(parser.games) == 0
+
+    def test_base_parser_finalize_row_is_abstract(self):
+        with pytest.raises(NotImplementedError):
+            DBBRowParser()._finalize_row()
 
 
 class TestReadGames:

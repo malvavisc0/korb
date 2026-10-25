@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.2] — 2026-10-25
+
+### Added
+
+- `backtest` command with chronological winner accuracy, Brier score,
+  score MAE, and score RMSE.
+- Per-game win probabilities in text and JSON predictions.
+- Opponent-adjusted offensive and defensive ratings via weighted ridge
+  regression.
+- Fitted home advantage with a 3% prior and fitted score volatility.
+
+### Changed
+
+- Prediction ratings are now additive strength coefficients converted
+  to the multiplicative score model.
+- Recent form uses opponent-adjusted residuals instead of raw scoring.
+- Removed the hard three-game rating cutoff; ridge regularization
+  handles thin samples.
+- Split the prediction code into `model.py`, `predict.py`, and
+  `backtest.py`.
+
 ## [0.3.1] — 2026-10-25
 
 ### Changed

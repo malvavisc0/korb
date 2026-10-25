@@ -126,9 +126,9 @@ Write the simplest correct solution. Delete anything that isn't needed.
   `set_defaults(func=cmd_<name>)`. Global flags are `--results`,
   `--schedule`, `--json`, `--ligaid`, `--download`.
 - Feature modules sit next to the CLI (`standings.py`, `team.py`,
-  `schedule.py`, `predict.py`, `ergebnisse.py`, `download.py`); shared
-  models, HTML parsing, date/score helpers, and output headers live in
-  `core.py`.
+  `schedule.py`, `model.py`, `predict.py`, `backtest.py`,
+  `ergebnisse.py`, `download.py`); shared models, HTML parsing,
+  date/score helpers, and output headers live in `core.py`.
 - HTML parsing extends the shared public `DBBRowParser`
   (`<td>`/`<tr>`/`<strike>` state machine). Parser changes need a
   fixture in `tests/fixtures/` and a test; cover cancelled rows
@@ -136,8 +136,8 @@ Write the simplest correct solution. Delete anything that isn't needed.
 - Parsers return `(data, LeagueInfo)`. Every data command's `--json`
   response is a wrapped object built with `_liga_meta(...)` plus a
   named data key: `standings`, `results` (team), `ergebnisse`,
-  `schedule`, `predictions`, and `top`. `download` is a side-effect
-  command and emits no JSON.
+  `schedule`, `predictions`, `backtest`, and `top`. `download` is a
+  side-effect command and emits no JSON.
 - Data paths resolve as `files/<ligaid>/ergebnisse.html` and
   `files/<ligaid>/spielplan.html`; explicit `--results` / `--schedule`
   win. Use `_resolve_results` / `_resolve_schedule`, not ad hoc paths.

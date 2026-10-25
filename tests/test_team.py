@@ -6,8 +6,10 @@ from korb.core import LOCAL_TZ, Game
 from korb.team import (
     GameResult,
     _game_to_result,
+    _recent_record,
     _result_code,
     _sparkline_char,
+    _win_rate,
     get_team_results,
     print_bars,
     print_metrics,
@@ -162,9 +164,25 @@ class TestPrintBars:
         assert "└" in out
         assert "1 2" in out
 
+    def test_zero_diff_draws_axis_line(self, capsys):
+        results = [
+            GameResult(datetime(2026, 3, 1, 10, 0), "B", "Home", 80, 80, "D"),
+        ]
+        print_bars(results)
+        out = capsys.readouterr().out
+        assert "─" in out
+
     def test_empty_is_noop(self, capsys):
         print_bars([])
         assert capsys.readouterr().out == ""
+
+
+class TestMetricsHelpers:
+    def test_win_rate_empty(self):
+        assert _win_rate([]) == 0.0
+
+    def test_recent_record_empty(self):
+        assert _recent_record([]) == ("", 0)
 
 
 class TestPrintMetrics:
